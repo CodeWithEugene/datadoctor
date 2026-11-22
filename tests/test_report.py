@@ -1,3 +1,5 @@
+import re
+
 from datadoctor.config import load_config
 from datadoctor.dhis2 import Table
 from datadoctor.report import build_report, months_ending, render_html, render_text
@@ -102,9 +104,8 @@ def test_follow_up_list_is_a_table_worst_first():
     assert "Hima &lt;MCHP&gt;" in first_row and "<br>" in first_row
 
 
-def test_issue_counts_are_centered_other_numbers_right_aligned():
+def test_number_columns_and_their_headers_are_marked_for_centering():
     html = render_html(report())
     follow = html.split('aria-labelledby="follow-up-caption"')[1].split("</table>")[0]
-    assert '<th scope="col" class=center>Issues</th>' in follow and '<td class="num center">' in follow
-    reporting = html.split('aria-labelledby="reporting-caption"')[1].split("</table>")[0]
-    assert '<td class="num">' in reporting and "center" not in reporting
+    assert '<th scope="col" class=num>Issues</th>' in follow and re.search(r'<td class="num">\d+</td>', follow)
+    assert '<th scope="col">What to check</th>' in follow  # text columns stay start-aligned

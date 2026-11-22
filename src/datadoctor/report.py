@@ -200,8 +200,7 @@ caption { text-align: center; font-weight: 600; font-size: 1.1rem; padding-block
 th, td { text-align: start; vertical-align: top; padding: .4rem .6rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
 thead th { position: sticky; inset-block-start: 0; z-index: 1; background: Canvas; }
 tbody th { font-weight: 500; }
-td.num { text-align: end; font-variant-numeric: tabular-nums; }
-th.center, td.center { text-align: center; }
+th.num, td.num { text-align: center; font-variant-numeric: tabular-nums; }
 .wrap:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; }
 nav { position: sticky; inset-block-start: 0; z-index: 2; background: Canvas; justify-content: center;
       padding-block: .75rem; margin-block-end: .5rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
@@ -228,16 +227,16 @@ def html_page(title: str, body: str, nav: str = "") -> str:
 """
 
 
-def html_table(key: str, caption: str, headers: list[str], rows: list[list[str]], center: tuple[str, ...] = ()) -> str:
-    """Accessible data table. Cells are HTML (escape before passing); the first cell is the row header;
-    cells starting with a digit, +, - or n/a are right-aligned as numbers; columns named in `center` are centered."""
-    def cell(c: str, col: str) -> str:
-        num = c[:1].isdigit() or c[:1] in "+-" and c[1:2].isdigit() or c == "n/a"
-        classes = " ".join(x for x, on in (("num", num), ("center", col in center)) if on)
-        return f'<td class="{classes}">{c}</td>' if classes else f"<td>{c}</td>"
+def html_table(key: str, caption: str, headers: list[str], rows: list[list[str]]) -> str:
+    """Accessible data table. Cells are HTML (escape before passing); the first cell is the row header.
+    Number cells (starting with a digit, +, - or n/a) are centered, and so are the headers of number columns."""
+    def is_num(c: str) -> bool:
+        return c[:1].isdigit() or c[:1] in "+-" and c[1:2].isdigit() or c == "n/a"
 
-    head = "".join(f'<th scope="col"{" class=center" if h in center else ""}>{escape(h)}</th>' for h in headers)
-    body = "".join(f'<tr><th scope="row">{r[0]}</th>{"".join(cell(c, h) for c, h in zip(r[1:], headers[1:]))}</tr>'
+    num_cols = {i for i, c in enumerate(rows[0]) if i and is_num(c)} if rows else set()
+    head = "".join(f'<th scope="col"{" class=num" if i in num_cols else ""}>{escape(h)}</th>' for i, h in enumerate(headers))
+    body = "".join(f'<tr><th scope="row">{r[0]}</th>'
+                   + "".join(f'<td class="num">{c}</td>' if is_num(c) else f"<td>{c}</td>" for c in r[1:]) + "</tr>"
                    for r in rows) \
         or f'<tr><td colspan="{len(headers)}">None this month.</td></tr>'
     # tabindex + role=region: keyboard users can scroll wide tables, and screen readers announce them by caption.
@@ -251,8 +250,7 @@ def render_html(report: Report, nav: str = "") -> str:
     body = (
         html_table("follow-up", f"Follow up with these facilities first ({len(report.follow_up)}, most issues first)",
                    ["Facility", "Issues", "What to check"],
-                   [[e(f), str(len(why)), "<br>".join(e(w) for w in why)] for f, why in report.follow_up],
-                   center=("Issues",))
+                   [[e(f), str(len(why)), "<br>".join(e(w) for w in why)] for f, why in report.follow_up])
         + html_table("reporting", "Reporting", ["Dataset", "Reported", "On time", "Missing"],
                  [[e(h.dataset), _pct(h.rate), _pct(h.timely_rate), e(", ".join(h.missing)) or "None"]
                   for h in report.completeness])
