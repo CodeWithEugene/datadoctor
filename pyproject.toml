@@ -1,0 +1,25 @@
+[project]
+name = "datadoctor"
+version = "0.1.0"
+description = "Finds bad health data in DHIS2 and tells district teams exactly which facilities to fix."
+readme = "README.md"
+authors = [
+    { name = "Eugene Mutembei", email = "103780583+CodeWithEugene@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=2.12.0",
+    "httpx>=0.28.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[project.scripts]
+datadoctor = "datadoctor.cli:main"
