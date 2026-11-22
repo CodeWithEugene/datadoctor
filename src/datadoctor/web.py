@@ -22,6 +22,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, PlainTextResponse, Response
 from starlette.routing import Route
 
+from .ask import NOT_CONFIGURED, NotConfigured
 from .config import Config
 from .dhis2 import Dhis2Error, districts
 from .report import build_report, html_page, html_table, last_complete_month, period_label, render_html, render_index
@@ -123,11 +124,13 @@ def create_app(dhis2, config: Config, password: str | None = None, *, builder=bu
 
         try:
             answer = await run_in_threadpool(asker, dhis2, config, question)
+        except NotConfigured:
+            return ask_page(request, question, f'<p class="error" role="alert">{NOT_CONFIGURED}</p>', 503)
         except (ValueError, Dhis2Error) as e:
             return ask_page(request, question, f'<p class="error" role="alert">{escape(str(e))}</p>', 422)
         except anthropic.AnthropicError as e:
             log.warning("ask failed talking to Claude: %s", e)  # details stay in the server log
-            message = ("Questions aren't set up on this server yet (no Anthropic API key)."
+            message = (NOT_CONFIGURED
                        if isinstance(e, (anthropic.CredentialsError, anthropic.AuthenticationError))
                        else "Couldn't reach Claude just now. Please try again in a minute.")
             return ask_page(request, question, f'<p class="error" role="alert">{message}</p>', 503)

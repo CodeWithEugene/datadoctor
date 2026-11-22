@@ -6,3 +6,6 @@ reports/
 .env
 contacts*.toml
 !contacts.example.toml
+.deploy-password
+.vercel
+.env*

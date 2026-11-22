@@ -64,3 +64,22 @@ def test_answer_table_sorts_places_by_name_and_months_by_date():
     text = Answer("", *_named_rows(rows, names), "").table_text
     places_months = [line.split()[:2] for line in text.splitlines()[1:]]
     assert places_months == [["Bo", "August"], ["Kono", "August"], ["Kono", "September"], ["Kono", "October"]]
+
+
+def test_missing_claude_credentials_become_a_clear_not_configured_error(monkeypatch):
+    import datadoctor.ask as ask_module
+
+    def no_credentials(system, question):  # what the SDK raises on a server with no key at all
+        raise TypeError('"Could not resolve authentication method. Expected one of api_key, auth_token..."')
+
+    monkeypatch.setattr(ask_module, "_call_claude", no_credentials)
+    with pytest.raises(ask_module.NotConfigured, match="aren't set up"):
+        ask_module.plan_query("ANC1 by district", CATALOG)
+
+
+def test_other_type_errors_are_not_hidden(monkeypatch):
+    import datadoctor.ask as ask_module
+
+    monkeypatch.setattr(ask_module, "_call_claude", lambda s, q: (_ for _ in ()).throw(TypeError("a real bug")))
+    with pytest.raises(TypeError, match="a real bug"):
+        ask_module.plan_query("x", CATALOG)

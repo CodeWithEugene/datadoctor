@@ -18,6 +18,13 @@ MODEL = "claude-opus-5-5"
 PERIOD = re.compile(r"^(\d{4}|\d{6}|\d{4}Q[1-4]|\d{4}W\d{1,2}|[A-Z_0-9]+)$")  # fixed or relative DHIS2 periods
 
 
+class NotConfigured(ValueError):
+    """No Anthropic credentials on this machine or server."""
+
+
+NOT_CONFIGURED = "Questions aren't set up on this server yet (no Anthropic API key)."
+
+
 class QueryPlan(BaseModel):
     data: list[str] = Field(description="uids of data elements or indicators from the catalog")
     periods: list[str] = Field(description="DHIS2 periods: YYYYMM, YYYY, YYYYQn, or relative like LAST_6_MONTHS")
@@ -91,7 +98,21 @@ def plan_query(question: str, catalog: Catalog) -> QueryPlan:
         # The catalog is large and identical for every question on an instance, so cache it.
         {"type": "text", "text": catalog_text, "cache_control": {"type": "ephemeral"}},
     ]
-    response = anthropic.Anthropic().beta.messages.parse(
+    try:
+        response = _call_claude(system, question)
+    except anthropic.CredentialsError as e:
+        raise NotConfigured(NOT_CONFIGURED) from e
+    except TypeError as e:  # how the SDK reports "no credentials at all" (e.g. on a fresh server)
+        if "authentication method" not in str(e):
+            raise
+        raise NotConfigured(NOT_CONFIGURED) from e
+    if response.stop_reason == "refusal" or response.parsed_output is None:
+        raise ValueError(f"Could not plan a query for that question (stop reason: {response.stop_reason}).")
+    return response.parsed_output
+
+
+def _call_claude(system: list[dict], question: str):
+    return anthropic.Anthropic().beta.messages.parse(
         model=MODEL,
         max_tokens=16000,
         system=system,
@@ -101,9 +122,6 @@ def plan_query(question: str, catalog: Catalog) -> QueryPlan:
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",
     )
-    if response.stop_reason == "refusal" or response.parsed_output is None:
-        raise ValueError(f"Could not plan a query for that question (stop reason: {response.stop_reason}).")
-    return response.parsed_output
 
 
 def _named_rows(rows: list[dict], names: dict[str, str]) -> tuple[list[str], list[list[str]]]:

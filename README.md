@@ -122,6 +122,19 @@ docker run --rm -p 8000:8000 -e DATADOCTOR_PASSWORD=... -e DHIS2_URL=... -e DHIS
   -e ANTHROPIC_API_KEY=... datadoctor serve --host 0.0.0.0
 ```
 
+### Deploy to Vercel
+
+`api/index.py` and `vercel.json` run the web app on Vercel. It won't start without a password.
+
+```bash
+vercel project add datadoctor && vercel link --yes --project datadoctor
+vercel env add DATADOCTOR_PASSWORD production      # required
+vercel env add ANTHROPIC_API_KEY production        # optional: turns on /ask
+vercel env add DHIS2_URL production                 # plus DHIS2_USER, DHIS2_PASSWORD for your instance
+vercel deploy --prod
+vercel domains add your.domain.example datadoctor
+```
+
 Schedule it monthly with cron, or with a GitHub Actions workflow like
 [`.github/workflows/demo.yml`](.github/workflows/demo.yml), which builds the live demo.
 

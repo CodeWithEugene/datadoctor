@@ -24,6 +24,9 @@ def fake_report(dhis2, config, uid, period):
 
 
 def fake_ask(dhis2, config, question):
+    if "unconfigured" in question:
+        from datadoctor.ask import NOT_CONFIGURED, NotConfigured
+        raise NotConfigured(NOT_CONFIGURED)
     if "no key" in question:
         raise anthropic.CredentialsError("Credentials file not found at /home/secret/path")
     if "fail" in question:
@@ -88,3 +91,8 @@ def test_ask_refuses_cross_site_posts():
 def test_claude_setup_errors_are_friendly_and_leak_nothing():
     r = client().post("/ask", data={"q": "no key"}, headers={"Sec-Fetch-Site": "same-origin"})
     assert r.status_code == 503 and "aren't set up" in r.text and "/home/secret" not in r.text
+
+
+def test_server_without_claude_key_says_so_with_503():
+    r = client().post("/ask", data={"q": "unconfigured"}, headers={"Sec-Fetch-Site": "same-origin"})
+    assert r.status_code == 503 and "aren't set up" in r.text
