@@ -203,7 +203,7 @@ FAVICON = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quot
 
 _STYLE = """<style>
 :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
-body { max-inline-size: 110rem; margin-inline: auto; padding: 1rem clamp(1rem, 4vw, 3rem); background: Canvas; color: CanvasText; }
+body { max-inline-size: 110rem; margin: 0 auto; padding: 1rem clamp(1rem, 4vw, 3rem); background: Canvas; color: CanvasText; }
 .wrap { overflow: auto; max-block-size: min(32rem, 80vh); margin-block-end: 2rem; }
 table { border-collapse: separate; border-spacing: 0; inline-size: 100%; }
 caption { text-align: center; font-weight: 600; font-size: 1.1rem; padding-block: .5rem; }
@@ -223,7 +223,9 @@ h1, h2 { text-align: center; text-wrap: balance; }
 .examples ul { list-style: none; padding: 0; text-align: center; }
 .examples li { margin-block: .25rem; }
 .lede { text-align: center; max-inline-size: 48rem; margin-inline: auto; text-wrap: pretty; }
-.login { max-inline-size: 22rem; margin: 2rem auto; padding: 1.5rem; border-radius: .75rem;
+main:has(> .login) { min-block-size: calc(100dvh - 2rem); display: flex; flex-direction: column; justify-content: center; }
+main:has(> .login) h1 { margin-block: 0 1rem; }
+.login { inline-size: min(22rem, 100%); box-sizing: border-box; margin: 0 auto; padding: 1.5rem; border-radius: .75rem;
          border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
 .login .logo { display: block; inline-size: 9rem; block-size: auto; margin: 0 auto 1.25rem; }
 .login form { flex-direction: column; align-items: stretch; margin: 0; gap: .9rem; }
