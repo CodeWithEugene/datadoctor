@@ -206,10 +206,10 @@ th.center, td.center { text-align: center; }
 nav { position: sticky; inset-block-start: 0; z-index: 2; background: Canvas; justify-content: center;
       padding-block: .75rem; margin-block-end: .5rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
       display: flex; gap: 1.25rem; flex-wrap: wrap; }
-form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; margin-block: 1rem 1.5rem; }
+form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; justify-content: center; margin-block: 1rem 1.5rem; }
 label { display: block; font-weight: 600; }
 input, button { font: inherit; padding: .45rem .7rem; }
-input[type=text] { inline-size: min(36rem, 100%); }
+input[type=text] { inline-size: min(36rem, 80vw); }
 h1 { text-align: center; text-wrap: balance; }
 .lede { text-align: center; max-inline-size: 48rem; margin-inline: auto; text-wrap: pretty; }
 .error { border-inline-start: 4px solid #c62828; padding: .5rem 1rem; }
