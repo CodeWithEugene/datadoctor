@@ -49,9 +49,15 @@ def load_contacts(path: str) -> dict[str, list[Contact]]:
 
 
 class Sender:
-    def __init__(self, smtp: dict | None, whatsapp: dict | None, smtp_factory=smtplib.SMTP, http: httpx.Client | None = None):
+    def __init__(self, smtp: dict | None, whatsapp: dict | None, smtp_factory=smtplib.SMTP,
+                 smtp_ssl_factory=smtplib.SMTP_SSL, http: httpx.Client | None = None):
+        if smtp:
+            # 465 = implicit TLS; 587 = STARTTLS; "none" only for an internal relay or a local test server.
+            smtp = {**smtp, "security": smtp.get("security") or ("ssl" if smtp["port"] == 465 else "starttls")}
+            if smtp["security"] not in ("ssl", "starttls", "none"):
+                raise ValueError(f"SMTP_SECURITY must be ssl, starttls or none, not {smtp['security']!r}")
         self.smtp, self.whatsapp = smtp, whatsapp
-        self._smtp_factory = smtp_factory
+        self._smtp_factory, self._smtp_ssl_factory = smtp_factory, smtp_ssl_factory
         self._http = http or httpx.Client(timeout=30)
 
     @classmethod
@@ -60,14 +66,16 @@ class Sender:
         smtp = None
         if env("SMTP_HOST"):
             smtp = {"host": env("SMTP_HOST"), "port": int(env("SMTP_PORT", "587")), "user": env("SMTP_USER"),
-                    "password": env("SMTP_PASSWORD"), "from": env("SMTP_FROM", env("SMTP_USER", ""))}
+                    "password": env("SMTP_PASSWORD"), "from": env("SMTP_FROM", env("SMTP_USER", "")),
+                    "security": env("SMTP_SECURITY")}
         whatsapp = None
         if env("WHATSAPP_TOKEN"):
             whatsapp = {"token": env("WHATSAPP_TOKEN"), "phone_id": env("WHATSAPP_PHONE_ID"),
                         "version": env("WHATSAPP_API_VERSION", "v23.0")}
         return cls(smtp, whatsapp)
 
-    def send(self, contacts: list[Contact], subject: str, text: str, html: str) -> list[str]:
+    def send(self, contacts: list[Contact], subject: str, text: str, html: str,
+             attachment: tuple[str, str] | None = None) -> list[str]:
         """Send to everyone; return one line per failure instead of stopping at the first."""
         failures = []
         for c in contacts:
@@ -75,25 +83,30 @@ class Sender:
                 if not address:
                     continue
                 try:
-                    channel(address, subject, text, html)
+                    channel(address, subject, text, html, attachment)
                 except Exception as e:  # one bad recipient must not block the rest of the district
                     failures.append(f"{c.name} ({address}): {e}")
         return failures
 
-    def _email(self, to: str, subject: str, text: str, html: str) -> None:
+    def _email(self, to: str, subject: str, text: str, html: str, attachment: tuple[str, str] | None) -> None:
         if not self.smtp:
             raise RuntimeError("email not configured (set SMTP_HOST)")
         msg = EmailMessage()
         msg["From"], msg["To"], msg["Subject"] = self.smtp["from"], to, subject
         msg.set_content(text)
         msg.add_alternative(html, subtype="html")
-        with self._smtp_factory(self.smtp["host"], self.smtp["port"], timeout=30) as server:
-            server.starttls()
+        if attachment:
+            filename, content = attachment
+            msg.add_attachment(content, subtype="html", filename=filename)
+        factory = self._smtp_ssl_factory if self.smtp["security"] == "ssl" else self._smtp_factory
+        with factory(self.smtp["host"], self.smtp["port"], timeout=30) as server:
+            if self.smtp["security"] == "starttls":
+                server.starttls()
             if self.smtp.get("user"):
                 server.login(self.smtp["user"], self.smtp["password"])
             server.send_message(msg)
 
-    def _whatsapp(self, to: str, subject: str, text: str, html: str) -> None:
+    def _whatsapp(self, to: str, subject: str, text: str, html: str, attachment=None) -> None:
         if not self.whatsapp:
             raise RuntimeError("WhatsApp not configured (set WHATSAPP_TOKEN and WHATSAPP_PHONE_ID)")
         w = self.whatsapp

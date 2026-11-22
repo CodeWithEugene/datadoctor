@@ -261,3 +261,36 @@ def render_index(reports: list[tuple[Report, str]], instance: str) -> str:
              f"{e(instance)}. Pick a district for its full report.</p>")
     return _page(f"{instance}: data quality, {period_label(first.period)}",
                  intro + _table("districts", f"Districts ({len(reports)})", headers, rows))
+
+
+def render_email(report: Report, report_url: str | None, top: int = 15) -> str:
+    """Email body. Email clients drop <style> and modern CSS, so: inline styles, plain tables, 600px wide."""
+    e = escape
+    td = 'style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top"'
+    th = 'style="padding:6px 8px;border-bottom:2px solid #999;text-align:left"'
+    reporting = "".join(
+        f"<tr><td {td}>{e(h.dataset)}</td><td {td}>{_pct(h.rate)}</td><td {td}>{_pct(h.timely_rate)}</td></tr>"
+        for h in report.completeness)
+    follow = "".join(f"<li style=\"margin-bottom:6px\"><strong>{e(f)}</strong>: {e('; '.join(why))}</li>"
+                     for f, why in report.follow_up[:top])
+    more = len(report.follow_up) - top
+    trends = "".join(f"<li>{e(t.element)}: {t.ratio - 1:+.0%} vs usual ({t.value:g} vs ~{t.average:.0f})</li>"
+                     for t in report.trends)
+    full = (f'<a href="{e(report_url)}" style="color:#0b5cad">Open the full report</a>' if report_url
+            else "The full report is attached.")
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{e(report.district)}</title></head>
+<body style="margin:0;padding:16px;background:#ffffff;color:#1a1a1a;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5">
+<div style="max-width:600px;margin:0 auto">
+<h1 style="font-size:20px;margin:0 0 4px">{e(report.district)}: data quality, {period_label(report.period)}</h1>
+<p style="margin:0 0 16px;color:#555">{len(report.outliers)} unusual values, {len(report.violations)} numbers that
+don't add up, {len(report.follow_up)} facilities to follow up.</p>
+<table style="border-collapse:collapse;width:100%;margin-bottom:16px">
+<tr><th {th}>Dataset</th><th {th}>Reported</th><th {th}>On time</th></tr>{reporting}</table>
+<h2 style="font-size:17px;margin:16px 0 8px">Follow up with these facilities first</h2>
+<ol style="padding-left:20px;margin:0">{follow or "<li>No problems found. Nice work.</li>"}</ol>
+{f'<p style="color:#555">…and {more} more in the full report.</p>' if more > 0 else ""}
+{f'<h2 style="font-size:17px;margin:16px 0 8px">District trends beyond ±33%</h2><ul style="padding-left:20px;margin:0">{trends}</ul>' if trends else ""}
+<p style="margin-top:20px">{full}</p>
+<p style="margin-top:24px;font-size:12px;color:#777">Sent by DataDoctor. Checks follow the WHO Data Quality Review.</p>
+</div></body></html>
+"""

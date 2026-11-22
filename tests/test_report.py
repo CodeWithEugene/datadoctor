@@ -83,3 +83,13 @@ def test_overview_links_every_district_and_shows_its_numbers():
     html = render_index([(report(), "202610-bo.html")], "Sierra Leone (DHIS2 demo)")
     assert 'href="202610-bo.html"' in html and ">Bo<" in html
     assert "50%" in html  # Reproductive Health completeness
+
+
+def test_email_body_is_email_safe_and_links_the_full_report():
+    from datadoctor.report import render_email
+
+    html = render_email(report(), "https://reports.example.org/202610-bo.html")
+    assert "<style" not in html  # many email clients drop <style>; everything is inline
+    assert "Hima &lt;MCHP&gt;" in html
+    assert 'href="https://reports.example.org/202610-bo.html"' in html
+    assert "attached" in render_email(report(), None)

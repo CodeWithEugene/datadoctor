@@ -9,7 +9,7 @@ from pathlib import Path
 from .config import load_config
 from .dhis2 import Dhis2, Dhis2Error
 from .deliver import Sender, load_contacts
-from .report import build_report, render_html, render_index, render_text
+from .report import build_report, period_label, render_email, render_html, render_index, render_text
 
 # The public DHIS2 demo and its published demo login. Override with env vars for a real instance.
 DEMO_URL = "https://play.im.dhis2.org/stable-2-42-7-1"
@@ -63,7 +63,11 @@ def cmd_report(args) -> None:
             people = contacts.get(name.lower()) or contacts.get(uid.lower()) or []
             if not people:
                 print(f"(no contacts for {name}; not sent)\n")
-            failures += sender.send(people, f"DataDoctor: {name}, {period}", text, html)
+            # Optional: where the HTML reports are published (e.g. GitHub Pages), so emails can link to them.
+            base = os.environ.get("DATADOCTOR_REPORT_URL")
+            url = f"{base.rstrip('/')}/{path.name}" if base else None
+            failures += sender.send(people, f"DataDoctor: {name}, {period_label(period)}", text,
+                                    render_email(report, url), attachment=(path.name, html))
     index = out / "index.html"
     index.write_text(render_index(done, config.name), encoding="utf-8")
     print(f"Overview: {index}")
