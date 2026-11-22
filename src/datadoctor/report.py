@@ -203,7 +203,9 @@ tbody th { font-weight: 500; }
 td.num { text-align: end; font-variant-numeric: tabular-nums; }
 th.center, td.center { text-align: center; }
 .wrap:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; }
-nav { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+nav { position: sticky; inset-block-start: 0; z-index: 2; background: Canvas; justify-content: center;
+      padding-block: .75rem; margin-block-end: .5rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+      display: flex; gap: 1.25rem; flex-wrap: wrap; }
 form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; margin-block: 1rem 1.5rem; }
 label { display: block; font-weight: 600; }
 input, button { font: inherit; padding: .45rem .7rem; }
