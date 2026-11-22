@@ -72,6 +72,12 @@ def months_ending(period: str, n: int) -> list[str]:
     return out[::-1]
 
 
+def last_complete_month(today: date | None = None) -> str:
+    today = today or date.today()
+    y, m = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+    return f"{y}{m:02d}"
+
+
 def period_label(period: str) -> str:
     return date(int(period[:4]), int(period[4:]), 1).strftime("%B %Y")
 
@@ -196,20 +202,26 @@ thead th { position: sticky; inset-block-start: 0; z-index: 1; background: Canva
 tbody th { font-weight: 500; }
 td.num { text-align: end; font-variant-numeric: tabular-nums; }
 .wrap:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; }
+nav { max-width: 64rem; margin: 0 auto; padding: 0 1rem; display: flex; gap: 1.25rem; flex-wrap: wrap; }
+form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; margin-block: 1rem 1.5rem; }
+label { display: block; font-weight: 600; }
+input, button { font: inherit; padding: .45rem .7rem; }
+input[type=text] { inline-size: min(36rem, 100%); }
+.error { border-inline-start: 4px solid #c62828; padding: .5rem 1rem; }
 </style>"""
 
 
-def _page(title: str, body: str) -> str:
+def html_page(title: str, body: str, nav: str = "") -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>{escape(title)}</title>{_STYLE}</head>
-<body><main><h1>{escape(title)}</h1>
+<body>{nav}<main><h1>{escape(title)}</h1>
 {body}
 </main></body></html>
 """
 
 
-def _table(key: str, caption: str, headers: list[str], rows: list[list[str]]) -> str:
+def html_table(key: str, caption: str, headers: list[str], rows: list[list[str]]) -> str:
     """Accessible data table. Cells are HTML (escape before passing); the first cell is the row header;
     cells starting with a digit, +, - or n/a are right-aligned as numbers."""
     def cell(c: str) -> str:
@@ -225,32 +237,32 @@ def _table(key: str, caption: str, headers: list[str], rows: list[list[str]]) ->
             f"<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>")
 
 
-def render_html(report: Report) -> str:
+def render_html(report: Report, nav: str = "") -> str:
     e = escape
     calls = "".join(f"<li><strong>{e(f)}</strong>: {e('; '.join(why))}</li>" for f, why in report.follow_up)
     body = (
         f"<h2>Follow up with these facilities first</h2><ol>{calls or '<li>No problems found.</li>'}</ol>"
-        + _table("reporting", "Reporting", ["Dataset", "Reported", "On time", "Missing"],
+        + html_table("reporting", "Reporting", ["Dataset", "Reported", "On time", "Missing"],
                  [[e(h.dataset), _pct(h.rate), _pct(h.timely_rate), e(", ".join(h.missing)) or "None"]
                   for h in report.completeness])
-        + _table("outliers", f"Unusual values ({len(report.outliers)})", ["Facility", "Data element", "This month", "Usual"],
+        + html_table("outliers", f"Unusual values ({len(report.outliers)})", ["Facility", "Data element", "This month", "Usual"],
                  [[e(o.facility), e(o.element), f"{o.value:g}", f"{o.typical:g}"] for o in report.outliers])
-        + _table("trends", f"District trends beyond ±33% ({len(report.trends)})",
+        + html_table("trends", f"District trends beyond ±33% ({len(report.trends)})",
                  ["Data element", "This month", "Usual", "Change"],
                  [[e(t.element), f"{t.value:g}", f"{t.average:.0f}", f"{t.ratio - 1:+.0%}"] for t in report.trends])
-        + _table("violations", f"Numbers that don't add up ({len(report.violations)})",
+        + html_table("violations", f"Numbers that don't add up ({len(report.violations)})",
                  ["Facility", "Problem", "Should be higher", "Should be lower"],
                  [[e(v.facility), e(v.why), f"{e(v.more)}: {v.more_value:g}", f"{e(v.less)}: {v.less_value:g}"]
                   for v in report.violations])
     )
-    return _page(f"{report.district}: data quality, {period_label(report.period)}", body)
+    return html_page(f"{report.district}: data quality, {period_label(report.period)}", body, nav)
 
 
-def render_index(reports: list[tuple[Report, str]], instance: str) -> str:
+def render_index(reports: list[tuple[Report, str]], instance: str, nav: str = "", before_table: str = "") -> str:
     """Overview page: one row per district, linking to its full report. Static, so it can be hosted anywhere."""
     e = escape
     if not reports:
-        return _page(f"{instance}: data quality", "<p>No reports.</p>")
+        return html_page(f"{instance}: data quality", "<p>No reports.</p>")
     first = reports[0][0]
     headers = (["District"] + [f"{h.dataset} reported" for h in first.completeness]
                + ["Unusual values", "Don't add up", "Trends", "Facilities to follow up"])
@@ -259,8 +271,8 @@ def render_index(reports: list[tuple[Report, str]], instance: str) -> str:
             for r, path in reports]
     intro = ('<p>Generated by <a href="https://github.com/CodeWithEugene/datadoctor">DataDoctor</a> from '
              f"{e(instance)}. Pick a district for its full report.</p>")
-    return _page(f"{instance}: data quality, {period_label(first.period)}",
-                 intro + _table("districts", f"Districts ({len(reports)})", headers, rows))
+    return html_page(f"{instance}: data quality, {period_label(first.period)}",
+                 intro + before_table + html_table("districts", f"Districts ({len(reports)})", headers, rows), nav)
 
 
 def render_email(report: Report, report_url: str | None, top: int = 15) -> str:

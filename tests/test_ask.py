@@ -57,9 +57,10 @@ def test_ask_runs_the_planned_query_and_names_everything():
 
 
 def test_answer_table_sorts_places_by_name_and_months_by_date():
-    from datadoctor.ask import _table_text
+    from datadoctor.ask import Answer, _named_rows
 
     rows = [{"ou": "b", "pe": p, "value": 1.0} for p in ("202610", "202608", "202609")] + [{"ou": "a", "pe": "202608", "value": 2.0}]
     names = {"a": "Bo", "b": "Kono", "202608": "August 2026", "202609": "September 2026", "202610": "October 2026"}
-    places_months = [line.split()[:2] for line in _table_text(rows, names).splitlines()[1:]]
+    text = Answer("", *_named_rows(rows, names), "").table_text
+    places_months = [line.split()[:2] for line in text.splitlines()[1:]]
     assert places_months == [["Bo", "August"], ["Kono", "August"], ["Kono", "September"], ["Kono", "October"]]

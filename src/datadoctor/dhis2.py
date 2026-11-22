@@ -44,3 +44,17 @@ class Dhis2:
             rows.append(row)
         names = {uid: item["name"] for uid, item in data.get("metaData", {}).get("items", {}).items()}
         return Table(rows, names)
+
+
+def districts(dhis2: Dhis2, level: int, wanted: list[str] = ()) -> list[tuple[str, str]]:
+    """(uid, name) for the requested districts (by name or uid, case-insensitive), or all of them."""
+    units = dhis2.get("organisationUnits", filter=f"level:eq:{level}", fields="id,name", paging="false")
+    units = sorted(((u["id"], u["name"]) for u in units["organisationUnits"]), key=lambda u: u[1])
+    if not wanted:
+        return units
+    keys = {w.lower() for w in wanted}
+    found = [(uid, name) for uid, name in units if uid.lower() in keys or name.lower() in keys]
+    unknown = keys - {k.lower() for u in found for k in u}
+    if unknown:
+        raise Dhis2Error(f"Unknown district(s): {', '.join(sorted(unknown))}. Known: {', '.join(n for _, n in units)}")
+    return found

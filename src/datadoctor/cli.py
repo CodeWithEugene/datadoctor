@@ -3,22 +3,15 @@
 import argparse
 import os
 import sys
-from datetime import date
 from pathlib import Path
 
 from .config import load_config
-from .dhis2 import Dhis2, Dhis2Error
+from .dhis2 import Dhis2, Dhis2Error, districts
 from .deliver import Sender, load_contacts
-from .report import build_report, period_label, render_email, render_html, render_index, render_text
+from .report import build_report, last_complete_month, period_label, render_email, render_html, render_index, render_text
 
 # The public DHIS2 demo and its published demo login. Override with env vars for a real instance.
 DEMO_URL = "https://play.im.dhis2.org/stable-2-42-7-1"
-
-
-def last_complete_month(today: date | None = None) -> str:
-    today = today or date.today()
-    y, m = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
-    return f"{y}{m:02d}"
 
 
 def connect() -> Dhis2:
@@ -27,20 +20,6 @@ def connect() -> Dhis2:
         os.environ.get("DHIS2_USER", "admin"),
         os.environ.get("DHIS2_PASSWORD", "district"),
     )
-
-
-def districts(dhis2: Dhis2, level: int, wanted: list[str]) -> list[tuple[str, str]]:
-    """(uid, name) for the requested districts (by name or uid, case-insensitive), or all of them."""
-    units = dhis2.get("organisationUnits", filter=f"level:eq:{level}", fields="id,name", paging="false")
-    units = sorted(((u["id"], u["name"]) for u in units["organisationUnits"]), key=lambda u: u[1])
-    if not wanted:
-        return units
-    keys = {w.lower() for w in wanted}
-    found = [(uid, name) for uid, name in units if uid.lower() in keys or name.lower() in keys]
-    unknown = keys - {k.lower() for u in found for k in u}
-    if unknown:
-        raise SystemExit(f"Unknown district(s): {', '.join(sorted(unknown))}. Known: {', '.join(n for _, n in units)}")
-    return found
 
 
 def cmd_report(args) -> None:
@@ -90,6 +69,19 @@ def cmd_ask(args) -> None:
     print(f"\nQuery: {answer.query_url}")
 
 
+def cmd_serve(args) -> None:
+    import uvicorn
+
+    from .web import create_app
+
+    password = os.environ.get("DATADOCTOR_PASSWORD")
+    if args.host not in ("127.0.0.1", "localhost", "::1") and not password:
+        sys.exit("Refusing to serve on a network address without DATADOCTOR_PASSWORD set: it exposes DHIS2 data.")
+    app = create_app(connect(), load_config(args.config), password=password)
+    print(f"DataDoctor on http://{args.host}:{args.port}  (Ctrl+C to stop)")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="datadoctor", description="Finds data quality issues in DHIS2 and tells each district which facilities to follow up with.")
     parser.add_argument("--config", default="config/sierra-leone-demo.toml", help="instance settings (TOML)")
@@ -105,6 +97,11 @@ def main(argv: list[str] | None = None) -> None:
     ask = sub.add_parser("ask", help="ask a question about the data in plain language")
     ask.add_argument("question")
     ask.set_defaults(func=cmd_ask)
+
+    serve = sub.add_parser("serve", help="run the interactive web app")
+    serve.add_argument("--host", default="127.0.0.1", help="address to listen on (default: this machine only)")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.set_defaults(func=cmd_serve)
 
     args = parser.parse_args(argv)
     try:

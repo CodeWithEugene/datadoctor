@@ -8,14 +8,16 @@ DHIS2 is the health information system used by ministries of health in 75+ count
 thousands of facilities report into it. Much of that data has quality issues (missing, late, or inconsistent),
 and finding them is slow work. Meanwhile district teams wait on analysts for answers to simple questions.
 
-DataDoctor does three things:
+DataDoctor does four things:
 
 1. **Monthly data quality report per district.** It checks completeness, timeliness, unusual values, district
    trends, and numbers that don't add up, then ranks which facilities to follow up with first. Each district gets
-   a short text version (sized for WhatsApp/SMS) and an HTML report, and there's an overview page for all districts.
-2. **Delivery.** It emails and WhatsApps each district its own report, so the follow-up list reaches the people
-   who act on it without anyone logging in.
-3. **Ask in plain language.** For example, "ANC 1st visits by district for the last 6 months". Claude turns the
+   a short text version and an HTML report, and there's an overview page for all districts.
+2. **Email delivery.** It emails each district its own report, so the follow-up list reaches the people who act
+   on it without anyone logging in. WhatsApp is optional.
+3. **Web app.** A password-protected site with the overview, each district's report for any month, and a question
+   box. Plain HTML, no JavaScript, so it works on slow connections and old phones.
+4. **Ask in plain language.** For example, "ANC 1st visits by district for the last 6 months". Claude turns the
    question into a DHIS2 analytics query, DataDoctor checks every ID against your instance, runs the query, and
    shows the exact query it ran.
 
@@ -59,19 +61,40 @@ Plain-language questions need an Anthropic API key (`ANTHROPIC_API_KEY`, or `ant
 uv run datadoctor ask "Which districts had the most ANC 1st visits last quarter?"
 ```
 
-## Send reports by email and WhatsApp
+## Send reports by email
 
 ```bash
 cp contacts.example.toml contacts.toml   # git-ignored: it holds personal data
-export SMTP_HOST=... SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM=...
-export WHATSAPP_TOKEN=... WHATSAPP_PHONE_ID=...
+export SMTP_HOST=smtp.example.org SMTP_USER=... SMTP_PASSWORD=... SMTP_FROM=datadoctor@example.org
 uv run datadoctor report --send contacts.toml
 ```
 
-Every contact is validated before anything is fetched or sent. One failed recipient doesn't stop the others,
-and failures are listed at the end (with a non-zero exit code, so cron or CI can alert you).
-WhatsApp uses Meta's Cloud API. Free-text messages only reach people who messaged your number in the
-last 24 hours, so for monthly sends to new recipients, register a message template with Meta.
+Each officer gets an email that renders the same in Gmail, Outlook, and phone mail apps: the reporting summary,
+the top 15 facilities to follow up, and any district trends, with the full report attached. If you publish the
+HTML reports somewhere (like the GitHub Pages demo), set `DATADOCTOR_REPORT_URL` to link to them instead.
+
+`SMTP_SECURITY` defaults to `ssl` on port 465 and `starttls` otherwise. Set it to `none` only for an internal
+relay. Every contact is validated before anything is fetched or sent. One failed recipient doesn't stop the
+others, and failures are listed at the end (with a non-zero exit code, so cron or CI can alert you).
+
+**WhatsApp (optional):** add `whatsapp = "+..."` to a contact and set `WHATSAPP_TOKEN` and `WHATSAPP_PHONE_ID`
+(Meta Cloud API). Plain-text WhatsApp messages only reach people who messaged your number in the last 24 hours.
+
+## Web app
+
+```bash
+uv run datadoctor serve                     # http://127.0.0.1:8000, this machine only
+DATADOCTOR_PASSWORD=... uv run datadoctor serve --host 0.0.0.0   # on your network
+```
+
+- `/`: overview of every district for any month
+- `/district/<uid>`: a district's full report
+- `/ask`: plain-language questions (needs an Anthropic API key on the server)
+
+It won't listen on a network address without `DATADOCTOR_PASSWORD`, because it shows DHIS2 data and can
+spend API credits. Put it behind HTTPS (any reverse proxy) when it's reachable beyond your own network.
+Reports are cached for an hour, and the first overview of a month builds all districts in parallel
+(about 4 seconds on the demo).
 
 ## Use your own DHIS2
 
@@ -93,6 +116,10 @@ docker build -t datadoctor .
 docker run --rm -e DHIS2_URL=... -e DHIS2_USER=... -e DHIS2_PASSWORD=... \
   -v "$PWD/config:/app/config" -v "$PWD/reports:/app/reports" \
   datadoctor --config config/my-country.toml report
+
+# or the web app
+docker run --rm -p 8000:8000 -e DATADOCTOR_PASSWORD=... -e DHIS2_URL=... -e DHIS2_USER=... -e DHIS2_PASSWORD=... \
+  -e ANTHROPIC_API_KEY=... datadoctor serve --host 0.0.0.0
 ```
 
 Schedule it monthly with cron, or with a GitHub Actions workflow like
@@ -118,6 +145,7 @@ These follow the WHO Data Quality Review dimensions.
 | `dhis2.py` | Thin DHIS2 Web API client | `tests/test_dhis2.py` (fake HTTP transport) |
 | `report.py` | Fetch → check → rank → render text, HTML, overview | `tests/test_report.py` (fake DHIS2) |
 | `deliver.py` | Contacts, email (SMTP), WhatsApp (Cloud API) | `tests/test_deliver.py` (fake SMTP and HTTP) |
+| `web.py` | Web app: overview, district reports, ask | `tests/test_web.py` (fake DHIS2 and Claude) |
 | `ask.py` | Question → validated query plan → table | `tests/test_ask.py` (fake planner) |
 | `config.py`, `cli.py` | Settings and command line | |
 
@@ -132,6 +160,5 @@ catalog (names and IDs) do.
 
 ## Roadmap
 
-- WhatsApp message templates for business-initiated sends
 - Comparison with population denominators (WHO DQR external consistency)
-- Interactive web app with the `ask` box
+- Sign-in with DHIS2 accounts, so each user sees only their own districts

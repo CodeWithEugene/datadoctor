@@ -35,8 +35,17 @@ class Catalog:
 @dataclass
 class Answer:
     explanation: str
-    table_text: str
+    headers: list[str]
+    rows: list[list[str]]  # display names and formatted values, sorted
     query_url: str
+
+    @property
+    def table_text(self) -> str:
+        if not self.rows:
+            return "No data for that question."
+        lines = [self.headers] + self.rows
+        widths = [max(len(line[i]) for line in lines) for i in range(len(self.headers))]
+        return "\n".join("  ".join(cell.ljust(w) for cell, w in zip(line, widths)).rstrip() for line in lines)
 
 
 def load_catalog(dhis2: Dhis2, config: Config) -> Catalog:
@@ -97,18 +106,17 @@ def plan_query(question: str, catalog: Catalog) -> QueryPlan:
     return response.parsed_output
 
 
-def _table_text(rows: list[dict], names: dict[str, str]) -> str:
+def _named_rows(rows: list[dict], names: dict[str, str]) -> tuple[list[str], list[list[str]]]:
     if not rows:
-        return "No data for that question."
+        return [], []
     cols = [c for c in ("dx", "ou", "pe") if c in rows[0]]
     label = {"dx": "Data", "ou": "Place", "pe": "Period"}
+
     def sort_key(r):  # names alphabetically, periods chronologically (their uids sort by date)
         return [r[c] if c == "pe" else names.get(r[c], r[c]) for c in cols]
 
-    lines = [[label[c] for c in cols] + ["Value"]]
-    lines += [[names.get(r[c], r[c]) for c in cols] + [f"{r['value']:g}"] for r in sorted(rows, key=sort_key)]
-    widths = [max(len(line[i]) for line in lines) for i in range(len(lines[0]))]
-    return "\n".join("  ".join(cell.ljust(w) for cell, w in zip(line, widths)).rstrip() for line in lines)
+    body = [[names.get(r[c], r[c]) for c in cols] + [f"{r['value']:g}"] for r in sorted(rows, key=sort_key)]
+    return [label[c] for c in cols] + ["Value"], body
 
 
 def ask(dhis2: Dhis2, config: Config, question: str, catalog: Catalog | None = None, planner=plan_query) -> Answer:
@@ -118,4 +126,4 @@ def ask(dhis2: Dhis2, config: Config, question: str, catalog: Catalog | None = N
     dims = to_dimensions(plan)
     table = dhis2.analytics(dimension=dims)
     url = f"{dhis2.base_url}/api/analytics.json?" + "&".join(f"dimension={quote(d, safe=':;-_')}" for d in dims)
-    return Answer(plan.explanation, _table_text(table.rows, table.names), url)
+    return Answer(plan.explanation, *_named_rows(table.rows, table.names), url)
