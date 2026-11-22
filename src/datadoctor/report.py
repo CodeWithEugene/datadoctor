@@ -213,6 +213,12 @@ h1, h2 { text-align: center; text-wrap: balance; }
 .examples ul { list-style: none; padding: 0; text-align: center; }
 .examples li { margin-block: .25rem; }
 .lede { text-align: center; max-inline-size: 48rem; margin-inline: auto; text-wrap: pretty; }
+.login { max-inline-size: 22rem; margin: 2rem auto; padding: 1.5rem; border-radius: .75rem;
+         border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
+.login form { flex-direction: column; align-items: stretch; margin: 0; gap: .9rem; }
+.login input { inline-size: 100%; box-sizing: border-box; }
+nav .logout { margin: 0; }
+nav .logout button { font: inherit; padding: 0; border: 0; background: none; color: LinkText; text-decoration: underline; cursor: pointer; }
 .error { border-inline-start: 4px solid #c62828; padding: .5rem 1rem; }
 </style>"""
 

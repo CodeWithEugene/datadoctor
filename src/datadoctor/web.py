@@ -3,6 +3,7 @@
 Server-rendered HTML with plain forms and no JavaScript, so it works on slow connections and old phones.
 """
 
+import hashlib
 import hmac
 import logging
 import re
@@ -11,7 +12,7 @@ import time
 from base64 import b64decode
 from concurrent.futures import ThreadPoolExecutor
 from html import escape
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
@@ -19,7 +20,7 @@ from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, PlainTextResponse, Response
+from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 
 from .ask import NOT_CONFIGURED, NotConfigured
@@ -30,6 +31,9 @@ from .report import build_report, html_page, html_table, last_complete_month, pe
 log = logging.getLogger("datadoctor")
 PERIOD = re.compile(r"^(\d{4})-?(0[1-9]|1[0-2])$")  # 202610 or 2026-10 (what <input type=month> sends)
 MAX_QUESTION = 500
+SESSION_COOKIE = "dd_session"
+SESSION_SECONDS = 7 * 24 * 3600
+PUBLIC_PATHS = {"/healthz", "/login"}
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",
@@ -42,7 +46,8 @@ EXAMPLES = [
 ]
 
 
-def create_app(dhis2, config: Config, password: str | None = None, *, builder=build_report, asker=None,
+def create_app(dhis2, config: Config, password: str | None = None, *, username: str = "admin",
+               builder=build_report, asker=None,
                cache_seconds: int = 3600, workers: int = 6) -> Starlette:
     if asker is None:
         from .ask import ask as asker
@@ -69,9 +74,15 @@ def create_app(dhis2, config: Config, password: str | None = None, *, builder=bu
             cache[(uid, period)] = (now + cache_seconds, report)
         return report
 
+    # Sessions are signed with a key derived from the password, so changing the password signs everyone out.
+    key = hashlib.sha256(f"datadoctor-session:{username}:{password}".encode()).digest() if password else b""
+
     def nav(request: Request) -> str:
         root = request.scope.get("root_path", "") + "/"
-        return f'<nav aria-label="Main"><a href="{root}">Districts</a><a href="{root}ask">Ask a question</a></nav>'
+        logout = (f'<form method="post" action="{root}logout" class="logout"><button>Log out</button></form>'
+                  if password else "")
+        return (f'<nav aria-label="Main"><a href="{root}">Districts</a><a href="{root}ask">Ask a question</a>'
+                f"{logout}</nav>")
 
     def period_of(request: Request) -> str:
         raw = request.query_params.get("period")
@@ -143,9 +154,58 @@ def create_app(dhis2, config: Config, password: str | None = None, *, builder=bu
     async def healthz(request: Request) -> Response:
         return PlainTextResponse("ok")
 
+    def sign(expires: int) -> str:
+        return hmac.new(key, f"{username}.{expires}".encode(), hashlib.sha256).hexdigest()
+
+    def signed_in(request: Request) -> bool:
+        user, _, rest = request.cookies.get(SESSION_COOKIE, "").partition(".")
+        expires, _, sig = rest.partition(".")
+        if user != username or not expires.isdigit() or int(expires) < time.time():
+            return False
+        return hmac.compare_digest(sig, sign(int(expires)))
+
+    def login_page(request: Request, error: str = "", status: int = 200) -> Response:
+        nxt = request.query_params.get("next", "")
+        action = "login" + (f"?next={quote(nxt, safe='/')}" if nxt else "")
+        alert = f'<p class="error" role="alert">{escape(error)}</p>' if error else ""
+        body = (f'<div class="login">{alert}<form method="post" action="{action}">'
+                '<div><label for="username">Username</label>'
+                '<input type="text" id="username" name="username" autocomplete="username" required autofocus></div>'
+                '<div><label for="password">Password</label>'
+                '<input type="password" id="password" name="password" autocomplete="current-password" required></div>'
+                "<button>Sign in</button></form></div>")
+        return HTMLResponse(html_page("Sign in to DataDoctor", body), status_code=status)
+
+    async def login_get(request: Request) -> Response:
+        return login_page(request)
+
+    async def login_post(request: Request) -> Response:
+        form = parse_qs((await request.body()).decode(errors="replace"))
+        given_user, given_password = form.get("username", [""])[0], form.get("password", [""])[0]
+        ok_user = hmac.compare_digest(given_user.encode(), username.encode())
+        ok_password = hmac.compare_digest(given_password.encode(), (password or "").encode())
+        if not (password and ok_user and ok_password):
+            return login_page(request, "Wrong username or password.", 401)
+        nxt = request.query_params.get("next", "/")
+        if not nxt.startswith("/") or nxt.startswith("//") or "\\" in nxt:
+            nxt = "/"  # only ever send people back into this site
+        expires = int(time.time()) + SESSION_SECONDS
+        response = RedirectResponse(request.scope.get("root_path", "") + nxt, 303)
+        secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+        response.set_cookie(SESSION_COOKIE, f"{username}.{expires}.{sign(expires)}", max_age=SESSION_SECONDS,
+                            httponly=True, samesite="lax", secure=secure, path="/")
+        return response
+
+    async def logout(request: Request) -> Response:
+        response = RedirectResponse(request.scope.get("root_path", "") + "/login", 303)
+        response.delete_cookie(SESSION_COOKIE, path="/")
+        return response
+
     async def guard(request: Request, call_next) -> Response:
-        if password and request.url.path != "/healthz" and not _authorised(request, password):
-            return PlainTextResponse("Password required", 401, {"WWW-Authenticate": 'Basic realm="DataDoctor"'})
+        if password and request.url.path not in PUBLIC_PATHS \
+                and not (signed_in(request) or _basic_auth_ok(request, username, password)):
+            target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+            return RedirectResponse(f"{request.scope.get('root_path', '')}/login?next={quote(target, safe='/')}", 303)
         response = await call_next(request)
         response.headers.update(SECURITY_HEADERS)
         return response
@@ -157,18 +217,21 @@ def create_app(dhis2, config: Config, password: str | None = None, *, builder=bu
             Route("/ask", ask_get, methods=["GET"]),
             Route("/ask", ask_post, methods=["POST"]),
             Route("/healthz", healthz),
+            Route("/login", login_get, methods=["GET"]),
+            Route("/login", login_post, methods=["POST"]),
+            Route("/logout", logout, methods=["POST"]),
         ],
         middleware=[Middleware(BaseHTTPMiddleware, dispatch=guard)],
     )
 
 
-def _authorised(request: Request, password: str) -> bool:
-    """HTTP Basic auth; any username, the shared password. Serve behind HTTPS in production."""
+def _basic_auth_ok(request: Request, username: str, password: str) -> bool:
+    """HTTP Basic auth, for scripts (people use the login screen). Serve behind HTTPS in production."""
     scheme, _, value = request.headers.get("authorization", "").partition(" ")
     if scheme.lower() != "basic":
         return False
     try:
-        _, _, given = b64decode(value).decode().partition(":")
+        user, _, given = b64decode(value).decode().partition(":")
     except ValueError:
         return False
-    return hmac.compare_digest(given.encode(), password.encode())
+    return hmac.compare_digest(user.encode(), username.encode()) & hmac.compare_digest(given.encode(), password.encode())

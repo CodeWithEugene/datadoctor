@@ -16,4 +16,5 @@ if not password:  # fail closed: a public URL must never serve DHIS2 data withou
     raise RuntimeError("Set DATADOCTOR_PASSWORD in the Vercel project settings.")
 
 config = os.environ.get("DATADOCTOR_CONFIG", "config/sierra-leone-demo.toml")
-app = create_app(connect(), load_config(str(ROOT / config)), password=password)
+app = create_app(connect(), load_config(str(ROOT / config)), password=password,
+                 username=os.environ.get("DATADOCTOR_USER", "admin"))

@@ -77,7 +77,8 @@ def cmd_serve(args) -> None:
     password = os.environ.get("DATADOCTOR_PASSWORD")
     if args.host not in ("127.0.0.1", "localhost", "::1") and not password:
         sys.exit("Refusing to serve on a network address without DATADOCTOR_PASSWORD set: it exposes DHIS2 data.")
-    app = create_app(connect(), load_config(args.config), password=password)
+    app = create_app(connect(), load_config(args.config), password=password,
+                     username=os.environ.get("DATADOCTOR_USER", "admin"))
     print(f"DataDoctor on http://{args.host}:{args.port}  (Ctrl+C to stop)")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 

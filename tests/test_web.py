@@ -34,13 +34,19 @@ def fake_ask(dhis2, config, question):
     return Answer("ANC 1st visits by district", ["Place", "Value"], [["Bo", "812"]], "https://dhis/api/analytics.json?x")
 
 
-def client(password=None):
-    app = create_app(FakeDhis2(), CONFIG, password=password, builder=fake_report, asker=fake_ask)
-    return TestClient(app)
+def client(password=None, username="admin"):
+    app = create_app(FakeDhis2(), CONFIG, password=password, username=username, builder=fake_report, asker=fake_ask)
+    return TestClient(app, follow_redirects=False)
 
 
-def auth(password):
-    return {"Authorization": "Basic " + base64.b64encode(f"anyone:{password}".encode()).decode()}
+def auth(password, username="admin"):
+    return {"Authorization": "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()}
+
+
+def logged_in(password="s3cret"):
+    c = client(password=password)
+    assert c.post("/login", data={"username": "admin", "password": password}).status_code == 303
+    return c
 
 
 def test_overview_lists_every_district_with_a_link():
@@ -63,12 +69,48 @@ def test_bad_input_is_refused(url, status):
     assert client().get(url).status_code == status
 
 
-def test_password_protects_everything_but_the_health_check():
+def test_visitors_are_sent_to_the_login_screen_and_back_after_signing_in():
     c = client(password="s3cret")
-    assert c.get("/").status_code == 401
-    assert c.get("/", headers=auth("wrong")).status_code == 401
+    r = c.get("/district/O6uvpzGd5pu?period=202610")
+    assert r.status_code == 303 and r.headers["location"] == "/login?next=/district/O6uvpzGd5pu%3Fperiod%3D202610"
+    page = c.get("/login").text
+    assert '<input type="text" id="username" name="username"' in page and 'type="password"' in page
+    r = c.post("/login?next=/district/O6uvpzGd5pu%3Fperiod%3D202610", data={"username": "admin", "password": "s3cret"})
+    assert r.status_code == 303 and r.headers["location"] == "/district/O6uvpzGd5pu?period=202610"
+    cookie = r.headers["set-cookie"].lower()
+    assert "httponly" in cookie and "samesite=lax" in cookie
+    assert c.get("/district/O6uvpzGd5pu?period=202610").status_code == 200
+
+
+@pytest.mark.parametrize("username, password", [("admin", "wrong"), ("root", "s3cret"), ("", "")])
+def test_wrong_username_or_password_shows_an_error_on_the_login_screen(username, password):
+    r = client(password="s3cret").post("/login", data={"username": username, "password": password})
+    assert r.status_code == 401 and "Wrong username or password" in r.text and "set-cookie" not in r.headers
+
+
+def test_login_never_redirects_to_another_site():
+    r = client(password="s3cret").post("/login?next=//evil.example/x", data={"username": "admin", "password": "s3cret"})
+    assert r.headers["location"] == "/"
+
+
+def test_log_out_ends_the_session():
+    c = logged_in()
+    assert "Log out" in c.get("/").text
+    assert c.post("/logout").status_code == 303
+    assert c.get("/").status_code == 303
+
+
+def test_scripts_can_still_use_basic_auth_and_health_check_is_open():
+    c = client(password="s3cret")
     assert c.get("/", headers=auth("s3cret")).status_code == 200
+    assert c.get("/", headers=auth("s3cret", username="root")).status_code == 303
     assert c.get("/healthz").status_code == 200
+
+
+def test_a_forged_session_cookie_is_refused():
+    c = client(password="s3cret")
+    c.cookies.set("dd_session", "admin.0000")
+    assert c.get("/").status_code == 303
 
 
 def test_ask_shows_the_answer_and_the_exact_query():
