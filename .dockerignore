@@ -1,0 +1,5 @@
+.venv
+.git
+reports
+contacts.toml
+__pycache__
