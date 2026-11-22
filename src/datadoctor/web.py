@@ -104,7 +104,7 @@ def create_app(dhis2, config: Config, password: str | None = None, *, builder=bu
                 f'<label for="q">Your question</label>'
                 f'<input type="text" id="q" name="q" required maxlength="{MAX_QUESTION}" autocomplete="off" '
                 f'value="{escape(question)}"></div><button>Ask</button></form>')
-        intro = ("<p>Ask about any data in this DHIS2 instance. Claude picks the data, places and months; "
+        intro = ("<p class=lede>Ask about any data in this DHIS2 instance. Claude picks the data, places and months; "
                  "DataDoctor checks them against DHIS2 and shows the exact query. Only your question and data "
                  "element names are sent to Claude, never health data. Answers take a few seconds.</p>")
         body = intro + form + result + f"<h2>Examples</h2><ul>{examples}</ul>"
