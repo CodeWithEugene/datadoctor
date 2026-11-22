@@ -1,12 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <title>DataDoctor</title>
-  <rect width="64" height="64" rx="14" fill="#0f766e"/>
-  <g fill="#ffffff" fill-opacity="0.35">
-    <rect x="12" y="38" width="8" height="14" rx="2"/>
-    <rect x="24" y="30" width="8" height="22" rx="2"/>
-    <rect x="36" y="34" width="8" height="18" rx="2"/>
-    <rect x="48" y="24" width="4" height="28" rx="2"/>
-  </g>
-  <polyline points="8,30 20,30 25,18 32,42 38,24 42,30 56,30" fill="none" stroke="#ffffff"
-            stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 40" width="96" height="40">
+  <title>DataDoctor for DHIS2</title>
+  <style>
+    .dd-mark { stroke: #0f766e; fill: #0f766e; }
+    @media (prefers-color-scheme: dark) { .dd-mark { stroke: #2dd4bf; fill: #2dd4bf; } }
+  </style>
+  <polyline class="dd-mark" points="4,22 18,22 24,8 32,34 39,14 44,22 60,22" fill="none"
+            stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="fill:none"/>
+  <text class="dd-mark" x="64" y="25" stroke="none" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        font-size="9" font-weight="700" letter-spacing="0.4">DHIS2</text>
 </svg>

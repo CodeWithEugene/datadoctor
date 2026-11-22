@@ -197,7 +197,9 @@ def render_text(report: Report, top: int = 10) -> str:
 # One logo file: the favicon on every page (inline, so it also works in static and emailed reports)
 # and the mark on the sign-in page.
 LOGO_SVG = re.sub(r"<title>.*?</title>\s*", "", files("datadoctor").joinpath("logo.svg").read_text())
-FAVICON = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(" ".join(LOGO_SVG.split()))}">'
+# The favicon is the heartbeat line alone, cropped square: the "DHIS2" label is unreadable at 16px.
+_ICON = re.sub(r"<text.*?</text>\s*", "", LOGO_SVG, flags=re.S).replace('viewBox="0 0 96 40" width="96" height="40"', 'viewBox="0 -11 64 64" width="64" height="64"', 1)
+FAVICON = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(" ".join(_ICON.split()))}">'
 
 _STYLE = """<style>
 :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
@@ -223,7 +225,7 @@ h1, h2 { text-align: center; text-wrap: balance; }
 .lede { text-align: center; max-inline-size: 48rem; margin-inline: auto; text-wrap: pretty; }
 .login { max-inline-size: 22rem; margin: 2rem auto; padding: 1.5rem; border-radius: .75rem;
          border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
-.login .logo { display: block; inline-size: 4.5rem; block-size: 4.5rem; margin: 0 auto 1.25rem; }
+.login .logo { display: block; inline-size: 9rem; block-size: auto; margin: 0 auto 1.25rem; }
 .login form { flex-direction: column; align-items: stretch; margin: 0; gap: .9rem; }
 .login input { inline-size: 100%; box-sizing: border-box; }
 nav .logout { margin: 0; }

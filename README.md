@@ -1,4 +1,4 @@
-<p align="center"><img src="src/datadoctor/logo.svg" alt="DataDoctor logo" width="88" height="88"></p>
+<p align="center"><img src="src/datadoctor/logo.svg" alt="DataDoctor logo" width="192" height="80"></p>
 
 <h1 align="center">DataDoctor</h1>
 

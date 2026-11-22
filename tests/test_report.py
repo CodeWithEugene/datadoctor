@@ -114,3 +114,14 @@ def test_number_columns_and_their_headers_are_marked_for_centering():
 def test_every_page_carries_the_logo_as_its_favicon():
     for html in (render_html(report()), render_index([(report(), "x.html")], "Demo")):
         assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in html
+
+
+def test_favicon_is_the_heartbeat_line_only():
+    from urllib.parse import unquote
+
+    from datadoctor.report import FAVICON, LOGO_SVG
+
+    assert "DHIS2" in LOGO_SVG  # the full logo carries the label...
+    icon = unquote(FAVICON.split("data:image/svg+xml,")[1])
+    assert "<polyline" in icon and "<text" not in icon  # ...but at 16px it would be noise
+    assert 'viewBox="0 -11 64 64" width="64" height="64"' in icon  # square, so tabs don't squash it
