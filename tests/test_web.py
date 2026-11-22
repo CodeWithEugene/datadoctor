@@ -145,3 +145,8 @@ def test_login_screen_shows_the_logo():
     login = page.split('<div class="login">')[1]
     assert login.startswith('<svg') and 'aria-hidden="true"' in login.split(">")[0]
     assert "<title>" not in login.split("</svg>")[0]  # decorative here: the heading already names the app
+
+
+def test_csp_allows_only_the_inline_favicon_image():
+    csp = client().get("/healthz").headers["content-security-policy"]
+    assert "img-src data:" in csp and "default-src 'none'" in csp

@@ -3,8 +3,11 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
+import re
 from html import escape
+from importlib.resources import files
 from statistics import median
+from urllib.parse import quote
 
 from .checks import completeness, consistency_violations, outlier_score, trend_ratio
 from .config import Config
@@ -191,6 +194,11 @@ def render_text(report: Report, top: int = 10) -> str:
     return "\n".join(lines)
 
 
+# One logo file: the favicon on every page (inline, so it also works in static and emailed reports)
+# and the mark on the sign-in page.
+LOGO_SVG = re.sub(r"<title>.*?</title>\s*", "", files("datadoctor").joinpath("logo.svg").read_text())
+FAVICON = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(" ".join(LOGO_SVG.split()))}">'
+
 _STYLE = """<style>
 :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
 body { max-inline-size: 110rem; margin-inline: auto; padding: 1rem clamp(1rem, 4vw, 3rem); background: Canvas; color: CanvasText; }
@@ -227,7 +235,7 @@ nav .logout button { font: inherit; padding: 0; border: 0; background: none; col
 def html_page(title: str, body: str, nav: str = "") -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark"><title>{escape(title)}</title>{_STYLE}</head>
+<meta name="color-scheme" content="light dark"><title>{escape(title)}</title>{FAVICON}{_STYLE}</head>
 <body>{nav}<main><h1>{escape(title)}</h1>
 {body}
 </main></body></html>

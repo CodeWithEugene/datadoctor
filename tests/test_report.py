@@ -2,7 +2,7 @@ import re
 
 from datadoctor.config import load_config
 from datadoctor.dhis2 import Table
-from datadoctor.report import build_report, months_ending, render_html, render_text
+from datadoctor.report import build_report, months_ending, render_html, render_index, render_text
 
 CONFIG = load_config("config/sierra-leone-demo.toml")
 ANC1, ANC4, DS = "fbfJHSPpUQD", "hfdmMSPBgLG", "QX4ZTUbOt3a"
@@ -109,3 +109,8 @@ def test_number_columns_and_their_headers_are_marked_for_centering():
     follow = html.split('aria-labelledby="follow-up-caption"')[1].split("</table>")[0]
     assert '<th scope="col" class=num>Issues</th>' in follow and re.search(r'<td class="num">\d+</td>', follow)
     assert '<th scope="col">What to check</th>' in follow  # text columns stay start-aligned
+
+
+def test_every_page_carries_the_logo_as_its_favicon():
+    for html in (render_html(report()), render_index([(report(), "x.html")], "Demo")):
+        assert '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' in html

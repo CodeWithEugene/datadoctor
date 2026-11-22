@@ -12,7 +12,6 @@ import time
 from base64 import b64decode
 from concurrent.futures import ThreadPoolExecutor
 from html import escape
-from importlib.resources import files
 from urllib.parse import parse_qs, quote
 
 from starlette.applications import Starlette
@@ -27,19 +26,18 @@ from starlette.routing import Route
 from .ask import NOT_CONFIGURED, NotConfigured
 from .config import Config
 from .dhis2 import Dhis2Error, districts
-from .report import build_report, html_page, html_table, last_complete_month, period_label, render_html, render_index
+from .report import LOGO_SVG, build_report, html_page, html_table, last_complete_month, period_label, render_html, render_index
 
 log = logging.getLogger("datadoctor")
 PERIOD = re.compile(r"^(\d{4})-?(0[1-9]|1[0-2])$")  # 202610 or 2026-10 (what <input type=month> sends)
 MAX_QUESTION = 500
 # Inline SVG (no image request, so the strict CSP stays as it is); decorative next to the "DataDoctor" heading.
-LOGO = re.sub(r"<title>.*?</title>\s*", "", files("datadoctor").joinpath("logo.svg").read_text())
-LOGO = LOGO.replace("<svg ", '<svg aria-hidden="true" focusable="false" class="logo" ', 1)
+LOGO = LOGO_SVG.replace("<svg ", '<svg aria-hidden="true" focusable="false" class="logo" ', 1)
 SESSION_COOKIE = "dd_session"
 SESSION_SECONDS = 7 * 24 * 3600
 PUBLIC_PATHS = {"/healthz", "/login"}
 SECURITY_HEADERS = {
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'self'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
 }
