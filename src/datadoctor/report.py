@@ -196,7 +196,7 @@ _STYLE = """<style>
 body { max-inline-size: 110rem; margin-inline: auto; padding: 1rem clamp(1rem, 4vw, 3rem); background: Canvas; color: CanvasText; }
 .wrap { overflow: auto; max-block-size: min(32rem, 80vh); margin-block-end: 2rem; }
 table { border-collapse: separate; border-spacing: 0; inline-size: 100%; }
-caption { text-align: start; font-weight: 600; font-size: 1.1rem; padding-block: .5rem; }
+caption { text-align: center; font-weight: 600; font-size: 1.1rem; padding-block: .5rem; }
 th, td { text-align: start; vertical-align: top; padding: .4rem .6rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
 thead th { position: sticky; inset-block-start: 0; z-index: 1; background: Canvas; }
 tbody th { font-weight: 500; }
@@ -210,7 +210,9 @@ form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; justify-con
 label { display: block; font-weight: 600; }
 input, button { font: inherit; padding: .45rem .7rem; }
 input[type=text] { inline-size: min(36rem, 80vw); }
-h1 { text-align: center; text-wrap: balance; }
+h1, h2 { text-align: center; text-wrap: balance; }
+.examples ul { list-style: none; padding: 0; text-align: center; }
+.examples li { margin-block: .25rem; }
 .lede { text-align: center; max-inline-size: 48rem; margin-inline: auto; text-wrap: pretty; }
 .error { border-inline-start: 4px solid #c62828; padding: .5rem 1rem; }
 </style>"""

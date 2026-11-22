@@ -107,7 +107,7 @@ def create_app(dhis2, config: Config, password: str | None = None, *, builder=bu
         intro = ("<p class=lede>Ask about any data in this DHIS2 instance. Claude picks the data, places and months; "
                  "DataDoctor checks them against DHIS2 and shows the exact query. Only your question and data "
                  "element names are sent to Claude, never health data. Answers take a few seconds.</p>")
-        body = intro + form + result + f"<h2>Examples</h2><ul>{examples}</ul>"
+        body = intro + form + result + f'<section class="examples"><h2>Examples</h2><ul>{examples}</ul></section>'
         return HTMLResponse(html_page("Ask a question", body, nav(request)), status_code=status)
 
     async def ask_get(request: Request) -> Response:
