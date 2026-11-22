@@ -100,3 +100,11 @@ def test_follow_up_list_is_a_table_worst_first():
     assert '<caption id="follow-up-caption">Follow up with these facilities first (2, most issues first)</caption>' in html
     first_row = html.split('aria-labelledby="follow-up-caption"')[1].split("<tbody>")[1].split("</tr>")[0]
     assert "Hima &lt;MCHP&gt;" in first_row and "<br>" in first_row
+
+
+def test_issue_counts_are_centered_other_numbers_right_aligned():
+    html = render_html(report())
+    follow = html.split('aria-labelledby="follow-up-caption"')[1].split("</table>")[0]
+    assert '<th scope="col" class=center>Issues</th>' in follow and '<td class="num center">' in follow
+    reporting = html.split('aria-labelledby="reporting-caption"')[1].split("</table>")[0]
+    assert '<td class="num">' in reporting and "center" not in reporting

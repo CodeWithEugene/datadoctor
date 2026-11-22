@@ -193,7 +193,7 @@ def render_text(report: Report, top: int = 10) -> str:
 
 _STYLE = """<style>
 :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
-body { max-width: 64rem; margin: 0 auto; padding: 1rem; background: Canvas; color: CanvasText; }
+body { max-inline-size: 110rem; margin-inline: auto; padding: 1rem clamp(1rem, 4vw, 3rem); background: Canvas; color: CanvasText; }
 .wrap { overflow: auto; max-block-size: min(32rem, 80vh); margin-block-end: 2rem; }
 table { border-collapse: separate; border-spacing: 0; inline-size: 100%; }
 caption { text-align: start; font-weight: 600; font-size: 1.1rem; padding-block: .5rem; }
@@ -201,8 +201,9 @@ th, td { text-align: start; vertical-align: top; padding: .4rem .6rem; border-bl
 thead th { position: sticky; inset-block-start: 0; z-index: 1; background: Canvas; }
 tbody th { font-weight: 500; }
 td.num { text-align: end; font-variant-numeric: tabular-nums; }
+th.center, td.center { text-align: center; }
 .wrap:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; }
-nav { max-width: 64rem; margin: 0 auto; padding: 0 1rem; display: flex; gap: 1.25rem; flex-wrap: wrap; }
+nav { display: flex; gap: 1.25rem; flex-wrap: wrap; }
 form { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; margin-block: 1rem 1.5rem; }
 label { display: block; font-weight: 600; }
 input, button { font: inherit; padding: .45rem .7rem; }
@@ -221,15 +222,17 @@ def html_page(title: str, body: str, nav: str = "") -> str:
 """
 
 
-def html_table(key: str, caption: str, headers: list[str], rows: list[list[str]]) -> str:
+def html_table(key: str, caption: str, headers: list[str], rows: list[list[str]], center: tuple[str, ...] = ()) -> str:
     """Accessible data table. Cells are HTML (escape before passing); the first cell is the row header;
-    cells starting with a digit, +, - or n/a are right-aligned as numbers."""
-    def cell(c: str) -> str:
+    cells starting with a digit, +, - or n/a are right-aligned as numbers; columns named in `center` are centered."""
+    def cell(c: str, col: str) -> str:
         num = c[:1].isdigit() or c[:1] in "+-" and c[1:2].isdigit() or c == "n/a"
-        return f'<td class="num">{c}</td>' if num else f"<td>{c}</td>"
+        classes = " ".join(x for x, on in (("num", num), ("center", col in center)) if on)
+        return f'<td class="{classes}">{c}</td>' if classes else f"<td>{c}</td>"
 
-    head = "".join(f'<th scope="col">{escape(h)}</th>' for h in headers)
-    body = "".join(f'<tr><th scope="row">{r[0]}</th>{"".join(cell(c) for c in r[1:])}</tr>' for r in rows) \
+    head = "".join(f'<th scope="col"{" class=center" if h in center else ""}>{escape(h)}</th>' for h in headers)
+    body = "".join(f'<tr><th scope="row">{r[0]}</th>{"".join(cell(c, h) for c, h in zip(r[1:], headers[1:]))}</tr>'
+                   for r in rows) \
         or f'<tr><td colspan="{len(headers)}">None this month.</td></tr>'
     # tabindex + role=region: keyboard users can scroll wide tables, and screen readers announce them by caption.
     return (f'<div class="wrap" tabindex="0" role="region" aria-labelledby="{key}-caption">'
@@ -242,7 +245,8 @@ def render_html(report: Report, nav: str = "") -> str:
     body = (
         html_table("follow-up", f"Follow up with these facilities first ({len(report.follow_up)}, most issues first)",
                    ["Facility", "Issues", "What to check"],
-                   [[e(f), str(len(why)), "<br>".join(e(w) for w in why)] for f, why in report.follow_up])
+                   [[e(f), str(len(why)), "<br>".join(e(w) for w in why)] for f, why in report.follow_up],
+                   center=("Issues",))
         + html_table("reporting", "Reporting", ["Dataset", "Reported", "On time", "Missing"],
                  [[e(h.dataset), _pct(h.rate), _pct(h.timely_rate), e(", ".join(h.missing)) or "None"]
                   for h in report.completeness])
