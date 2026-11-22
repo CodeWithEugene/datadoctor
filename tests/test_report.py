@@ -69,3 +69,9 @@ def test_text_summary_is_short_and_names_who_to_call():
 def test_html_escapes_facility_names():
     html = render_html(report())
     assert "Hima &lt;MCHP&gt;" in html and "Hima <MCHP>" not in html
+
+
+def test_district_trend_flags_big_swings_like_for_like():
+    trends = {t.element: t for t in report().trends}
+    assert trends["ANC 1st visit"].ratio > 1.33  # f1 jumped from ~41 to 400
+    assert "ANC 1st visit" in render_text(report())

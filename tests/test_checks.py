@@ -48,3 +48,16 @@ def test_consistency_treats_missing_side_as_zero():
     # Reporting ANC4 visits with no ANC1 at all is a violation; the reverse is not.
     values = {("f1", "anc4"): 5, ("f2", "anc1"): 5}
     assert consistency_violations(values, [("anc1", "anc4")]) == [("f1", "anc1", "anc4", 0, 5)]
+
+
+from datadoctor.checks import trend_ratio
+
+
+def test_trend_ratio_compares_this_month_to_the_usual_average():
+    assert trend_ratio([100, 100, 100], 150) == 1.5
+    assert trend_ratio([100, 200], 75) == 0.5
+
+
+def test_trend_ratio_without_history_is_none():
+    assert trend_ratio([0, 0], 10) is None
+    assert trend_ratio([], 10) is None

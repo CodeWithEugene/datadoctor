@@ -50,3 +50,10 @@ def consistency_violations(
             if va < vb:
                 out.append((ou, a, b, va, vb))
     return out
+
+
+def trend_ratio(history: list[float], value: float) -> float | None:
+    """This period divided by the average of earlier periods (WHO DQR "consistency over time")."""
+    if not history or not sum(history):
+        return None
+    return value / (sum(history) / len(history))

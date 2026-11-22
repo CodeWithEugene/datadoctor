@@ -6,10 +6,11 @@ from datetime import date
 from html import escape
 from statistics import median
 
-from .checks import completeness, consistency_violations, outlier_score
+from .checks import completeness, consistency_violations, outlier_score, trend_ratio
 from .config import Config
 
 OUTLIER_THRESHOLD = 3.5  # modified z-score; the standard cut-off (Iglewicz & Hoaglin)
+TREND_LIMIT = 0.33  # WHO DQR flags a change of more than ±33% against the usual average
 MIN_HISTORY = 6  # months of history needed before we judge a value
 REPORT_METRICS = ("EXPECTED_REPORTS", "ACTUAL_REPORTS", "ACTUAL_REPORTS_ON_TIME")
 
@@ -42,6 +43,14 @@ class Violation:
     why: str
 
 
+@dataclass(frozen=True)
+class Trend:
+    element: str
+    value: float  # district total this month, facilities that reported only
+    average: float  # same facilities, average of the previous months
+    ratio: float
+
+
 @dataclass
 class Report:
     district: str
@@ -49,6 +58,7 @@ class Report:
     completeness: list[DatasetHealth]
     outliers: list[Outlier]
     violations: list[Violation]
+    trends: list[Trend] = field(default_factory=list)
     facilities_to_call: list[tuple[str, list[str]]] = field(default_factory=list)  # (facility, reasons), worst first
 
 
@@ -117,7 +127,25 @@ def build_report(dhis2, config: Config, district: str, period: str) -> Report:
         for fac, a, b, va, vb in consistency_violations(current, [(r.more, r.less) for r in config.rules])
     ]
 
-    report = Report(name(district), period, health, outliers, violations)
+    # 3. District trend per watched element, like-for-like: only facilities that reported this month,
+    # so a missing report shows up under completeness rather than as a fake drop.
+    trends = []
+    for de in config.watch:
+        now, before = 0.0, defaultdict(float)
+        for (fac, d), by_period in series.items():
+            if d != de or period not in by_period:
+                continue
+            now += by_period[period]
+            for pe, v in by_period.items():
+                if pe != period:
+                    before[pe] += v
+        history = list(before.values())
+        ratio = trend_ratio(history, now) if len(history) >= MIN_HISTORY else None
+        if ratio is not None and abs(ratio - 1) > TREND_LIMIT:
+            trends.append(Trend(name(de), now, sum(history) / len(history), ratio))
+    trends.sort(key=lambda t: -abs(t.ratio - 1))
+
+    report = Report(name(district), period, health, outliers, violations, trends)
     report.facilities_to_call = _prioritise(report)
     return report
 
@@ -146,6 +174,8 @@ def render_text(report: Report, top: int = 10) -> str:
     for h in report.completeness:
         lines.append(f"- {h.dataset}: {_pct(h.rate)} reported, {_pct(h.timely_rate)} on time")
     lines.append(f"{len(report.outliers)} unusual values, {len(report.violations)} numbers that don't add up.")
+    for t in report.trends[:3]:
+        lines.append(f"Trend: {t.element} {t.ratio - 1:+.0%} vs usual ({t.value:g} vs ~{t.average:.0f})")
     if report.facilities_to_call:
         lines.append(f"Call these facilities first ({min(top, len(report.facilities_to_call))} of {len(report.facilities_to_call)}):")
         for i, (fac, why) in enumerate(report.facilities_to_call[:top], 1):
@@ -168,6 +198,9 @@ def render_html(report: Report) -> str:
     violations = "".join(
         f"<tr><td>{e(v.facility)}</td><td>{e(v.why)}</td><td>{e(v.more)}: {v.more_value:g}</td>"
         f"<td>{e(v.less)}: {v.less_value:g}</td></tr>" for v in report.violations)
+    trends = "".join(
+        f"<tr><td>{e(t.element)}</td><td>{t.value:g}</td><td>{t.average:.0f}</td><td>{t.ratio - 1:+.0%}</td></tr>"
+        for t in report.trends)
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{e(title)}</title>
@@ -186,6 +219,8 @@ caption {{ text-align: left; font-weight: 600; font-size: 1.1rem; padding: .5rem
 <tr><th>Dataset</th><th>Reported</th><th>On time</th><th>Missing</th></tr>{reporting}</table></div>
 <div class="wrap"><table><caption>Unusual values ({len(report.outliers)})</caption>
 <tr><th>Facility</th><th>Data element</th><th>This month</th><th>Usual</th></tr>{outliers}</table></div>
+<div class="wrap"><table><caption>District trends beyond ±33% ({len(report.trends)})</caption>
+<tr><th>Data element</th><th>This month</th><th>Usual</th><th>Change</th></tr>{trends}</table></div>
 <div class="wrap"><table><caption>Numbers that don't add up ({len(report.violations)})</caption>
 <tr><th>Facility</th><th>Problem</th><th>Should be higher</th><th>Should be lower</th></tr>{violations}</table></div>
 </body></html>
