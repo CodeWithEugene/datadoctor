@@ -59,7 +59,7 @@ class Report:
     outliers: list[Outlier]
     violations: list[Violation]
     trends: list[Trend] = field(default_factory=list)
-    facilities_to_call: list[tuple[str, list[str]]] = field(default_factory=list)  # (facility, reasons), worst first
+    follow_up: list[tuple[str, list[str]]] = field(default_factory=list)  # (facility, reasons), worst first
 
 
 def months_ending(period: str, n: int) -> list[str]:
@@ -146,7 +146,7 @@ def build_report(dhis2, config: Config, district: str, period: str) -> Report:
     trends.sort(key=lambda t: -abs(t.ratio - 1))
 
     report = Report(name(district), period, health, outliers, violations, trends)
-    report.facilities_to_call = _prioritise(report)
+    report.follow_up = _prioritise(report)
     return report
 
 
@@ -176,52 +176,88 @@ def render_text(report: Report, top: int = 10) -> str:
     lines.append(f"{len(report.outliers)} unusual values, {len(report.violations)} numbers that don't add up.")
     for t in report.trends[:3]:
         lines.append(f"Trend: {t.element} {t.ratio - 1:+.0%} vs usual ({t.value:g} vs ~{t.average:.0f})")
-    if report.facilities_to_call:
-        lines.append(f"Call these facilities first ({min(top, len(report.facilities_to_call))} of {len(report.facilities_to_call)}):")
-        for i, (fac, why) in enumerate(report.facilities_to_call[:top], 1):
+    if report.follow_up:
+        lines.append(f"Follow up with these facilities first ({min(top, len(report.follow_up))} of {len(report.follow_up)}):")
+        for i, (fac, why) in enumerate(report.follow_up[:top], 1):
             lines.append(f"{i}. {fac}: {'; '.join(why[:2])}{' …' if len(why) > 2 else ''}")
     else:
         lines.append("No problems found. Nice work.")
     return "\n".join(lines)
 
 
-def render_html(report: Report) -> str:
-    e = escape
-    title = f"{report.district}: data quality, {period_label(report.period)}"
-    calls = "".join(f"<li><strong>{e(f)}</strong>: {e('; '.join(why))}</li>" for f, why in report.facilities_to_call)
-    reporting = "".join(
-        f"<tr><td>{e(h.dataset)}</td><td>{_pct(h.rate)}</td><td>{_pct(h.timely_rate)}</td>"
-        f"<td>{e(', '.join(h.missing)) or '-'}</td></tr>" for h in report.completeness)
-    outliers = "".join(
-        f"<tr><td>{e(o.facility)}</td><td>{e(o.element)}</td><td>{o.value:g}</td><td>{o.typical:g}</td></tr>"
-        for o in report.outliers)
-    violations = "".join(
-        f"<tr><td>{e(v.facility)}</td><td>{e(v.why)}</td><td>{e(v.more)}: {v.more_value:g}</td>"
-        f"<td>{e(v.less)}: {v.less_value:g}</td></tr>" for v in report.violations)
-    trends = "".join(
-        f"<tr><td>{e(t.element)}</td><td>{t.value:g}</td><td>{t.average:.0f}</td><td>{t.ratio - 1:+.0%}</td></tr>"
-        for t in report.trends)
+_STYLE = """<style>
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
+body { max-width: 64rem; margin: 0 auto; padding: 1rem; background: Canvas; color: CanvasText; }
+.wrap { overflow: auto; max-block-size: min(32rem, 80vh); margin-block-end: 2rem; }
+table { border-collapse: separate; border-spacing: 0; inline-size: 100%; }
+caption { text-align: start; font-weight: 600; font-size: 1.1rem; padding-block: .5rem; }
+th, td { text-align: start; padding: .4rem .6rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
+thead th { position: sticky; inset-block-start: 0; z-index: 1; background: Canvas; }
+tbody th { font-weight: 500; }
+td.num { text-align: end; font-variant-numeric: tabular-nums; }
+.wrap:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; }
+</style>"""
+
+
+def _page(title: str, body: str) -> str:
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{e(title)}</title>
-<style>
-:root {{ color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }}
-body {{ max-width: 60rem; margin: 0 auto; padding: 1rem; }}
-table {{ border-collapse: collapse; width: 100%; margin-bottom: 2rem; }}
-th, td {{ text-align: left; padding: .4rem .6rem; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); }}
-caption {{ text-align: left; font-weight: 600; font-size: 1.1rem; padding: .5rem 0; }}
-.wrap {{ overflow-x: auto; }}
-</style></head><body>
-<h1>{e(title)}</h1>
-<h2>Call these facilities first</h2>
-<ol>{calls or "<li>No problems found.</li>"}</ol>
-<div class="wrap"><table><caption>Reporting</caption>
-<tr><th>Dataset</th><th>Reported</th><th>On time</th><th>Missing</th></tr>{reporting}</table></div>
-<div class="wrap"><table><caption>Unusual values ({len(report.outliers)})</caption>
-<tr><th>Facility</th><th>Data element</th><th>This month</th><th>Usual</th></tr>{outliers}</table></div>
-<div class="wrap"><table><caption>District trends beyond ±33% ({len(report.trends)})</caption>
-<tr><th>Data element</th><th>This month</th><th>Usual</th><th>Change</th></tr>{trends}</table></div>
-<div class="wrap"><table><caption>Numbers that don't add up ({len(report.violations)})</caption>
-<tr><th>Facility</th><th>Problem</th><th>Should be higher</th><th>Should be lower</th></tr>{violations}</table></div>
-</body></html>
+<meta name="color-scheme" content="light dark"><title>{escape(title)}</title>{_STYLE}</head>
+<body><main><h1>{escape(title)}</h1>
+{body}
+</main></body></html>
 """
+
+
+def _table(key: str, caption: str, headers: list[str], rows: list[list[str]]) -> str:
+    """Accessible data table. Cells are HTML (escape before passing); the first cell is the row header;
+    cells starting with a digit, +, - or n/a are right-aligned as numbers."""
+    def cell(c: str) -> str:
+        num = c[:1].isdigit() or c[:1] in "+-" and c[1:2].isdigit() or c == "n/a"
+        return f'<td class="num">{c}</td>' if num else f"<td>{c}</td>"
+
+    head = "".join(f'<th scope="col">{escape(h)}</th>' for h in headers)
+    body = "".join(f'<tr><th scope="row">{r[0]}</th>{"".join(cell(c) for c in r[1:])}</tr>' for r in rows) \
+        or f'<tr><td colspan="{len(headers)}">None this month.</td></tr>'
+    # tabindex + role=region: keyboard users can scroll wide tables, and screen readers announce them by caption.
+    return (f'<div class="wrap" tabindex="0" role="region" aria-labelledby="{key}-caption">'
+            f'<table><caption id="{key}-caption">{escape(caption)}</caption>'
+            f"<thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>")
+
+
+def render_html(report: Report) -> str:
+    e = escape
+    calls = "".join(f"<li><strong>{e(f)}</strong>: {e('; '.join(why))}</li>" for f, why in report.follow_up)
+    body = (
+        f"<h2>Follow up with these facilities first</h2><ol>{calls or '<li>No problems found.</li>'}</ol>"
+        + _table("reporting", "Reporting", ["Dataset", "Reported", "On time", "Missing"],
+                 [[e(h.dataset), _pct(h.rate), _pct(h.timely_rate), e(", ".join(h.missing)) or "None"]
+                  for h in report.completeness])
+        + _table("outliers", f"Unusual values ({len(report.outliers)})", ["Facility", "Data element", "This month", "Usual"],
+                 [[e(o.facility), e(o.element), f"{o.value:g}", f"{o.typical:g}"] for o in report.outliers])
+        + _table("trends", f"District trends beyond ±33% ({len(report.trends)})",
+                 ["Data element", "This month", "Usual", "Change"],
+                 [[e(t.element), f"{t.value:g}", f"{t.average:.0f}", f"{t.ratio - 1:+.0%}"] for t in report.trends])
+        + _table("violations", f"Numbers that don't add up ({len(report.violations)})",
+                 ["Facility", "Problem", "Should be higher", "Should be lower"],
+                 [[e(v.facility), e(v.why), f"{e(v.more)}: {v.more_value:g}", f"{e(v.less)}: {v.less_value:g}"]
+                  for v in report.violations])
+    )
+    return _page(f"{report.district}: data quality, {period_label(report.period)}", body)
+
+
+def render_index(reports: list[tuple[Report, str]], instance: str) -> str:
+    """Overview page: one row per district, linking to its full report. Static, so it can be hosted anywhere."""
+    e = escape
+    if not reports:
+        return _page(f"{instance}: data quality", "<p>No reports.</p>")
+    first = reports[0][0]
+    headers = (["District"] + [f"{h.dataset} reported" for h in first.completeness]
+               + ["Unusual values", "Don't add up", "Trends", "Facilities to follow up"])
+    rows = [[f'<a href="{e(path)}">{e(r.district)}</a>'] + [_pct(h.rate) for h in r.completeness]
+            + [str(len(r.outliers)), str(len(r.violations)), str(len(r.trends)), str(len(r.follow_up))]
+            for r, path in reports]
+    intro = ('<p>Generated by <a href="https://github.com/CodeWithEugene/datadoctor">DataDoctor</a> from '
+             f"{e(instance)}. Pick a district for its full report.</p>")
+    return _page(f"{instance}: data quality, {period_label(first.period)}",
+                 intro + _table("districts", f"Districts ({len(reports)})", headers, rows))

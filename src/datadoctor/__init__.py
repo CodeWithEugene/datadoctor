@@ -1,1 +1,1 @@
-"""DataDoctor: finds bad data in DHIS2 and tells district teams what to fix."""
+"""DataDoctor: Finds data quality issues in DHIS2 and tells each district which facilities to follow up with."""

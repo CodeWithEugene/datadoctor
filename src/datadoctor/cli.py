@@ -8,7 +8,8 @@ from pathlib import Path
 
 from .config import load_config
 from .dhis2 import Dhis2, Dhis2Error
-from .report import build_report, render_html, render_text
+from .deliver import Sender, load_contacts
+from .report import build_report, render_html, render_index, render_text
 
 # The public DHIS2 demo and its published demo login. Override with env vars for a real instance.
 DEMO_URL = "https://play.im.dhis2.org/stable-2-42-7-1"
@@ -46,13 +47,28 @@ def cmd_report(args) -> None:
     config = load_config(args.config)
     dhis2 = connect()
     period = args.period or last_complete_month()
+    contacts = load_contacts(args.send) if args.send else {}  # validate before any DHIS2 work
+    sender = Sender.from_env() if args.send else None
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    done, failures = [], []
     for uid, name in districts(dhis2, config.district_level, args.district):
         report = build_report(dhis2, config, uid, period)
         path = out / f"{period}-{name.lower().replace(' ', '-')}.html"
-        path.write_text(render_html(report), encoding="utf-8")
-        print(render_text(report), f"\nFull report: {path}\n", sep="\n")
+        html, text = render_html(report), render_text(report)
+        path.write_text(html, encoding="utf-8")
+        done.append((report, path.name))
+        print(text, f"\nFull report: {path}\n", sep="\n")
+        if sender:
+            people = contacts.get(name.lower()) or contacts.get(uid.lower()) or []
+            if not people:
+                print(f"(no contacts for {name}; not sent)\n")
+            failures += sender.send(people, f"DataDoctor: {name}, {period}", text, html)
+    index = out / "index.html"
+    index.write_text(render_index(done, config.name), encoding="utf-8")
+    print(f"Overview: {index}")
+    if failures:
+        sys.exit("Some messages were not sent:\n" + "\n".join(failures))
 
 
 def cmd_ask(args) -> None:
@@ -71,7 +87,7 @@ def cmd_ask(args) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="datadoctor", description="Find bad health data in DHIS2 and say what to fix.")
+    parser = argparse.ArgumentParser(prog="datadoctor", description="Finds data quality issues in DHIS2 and tells each district which facilities to follow up with.")
     parser.add_argument("--config", default="config/sierra-leone-demo.toml", help="instance settings (TOML)")
     sub = parser.add_subparsers(required=True)
 
@@ -79,6 +95,7 @@ def main(argv: list[str] | None = None) -> None:
     rep.add_argument("district", nargs="*", help="district names or uids (default: all)")
     rep.add_argument("--period", help="month as YYYYMM (default: last complete month)")
     rep.add_argument("--out", default="reports", help="folder for the HTML reports")
+    rep.add_argument("--send", metavar="CONTACTS", help="contacts TOML; email/WhatsApp each district its report")
     rep.set_defaults(func=cmd_report)
 
     ask = sub.add_parser("ask", help="ask a question about the data in plain language")

@@ -1,0 +1,14 @@
+# Who receives each district's monthly report. Copy to contacts.toml (git-ignored: it holds personal data).
+# Keys are district names (or uids) as in DHIS2. Each person needs an email, a WhatsApp number, or both.
+# Sending settings come from environment variables:
+#   Email:    SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+#   WhatsApp: WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_API_VERSION (v23.0)
+
+[[Bo]]
+name = "District Health Information Officer, Bo"
+email = "dhio.bo@example.org"
+whatsapp = "+23276000000"
+
+[[Kono]]
+name = "District Medical Officer, Kono"
+email = "dmo.kono@example.org"

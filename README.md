@@ -1,15 +1,15 @@
 # DataDoctor
 
-**Finds bad health data in DHIS2 and tells each district exactly which facilities to fix.**
+**Finds data quality issues in DHIS2 and tells each district which facilities to follow up with.**
 
 DHIS2 is the health information system used by ministries of health in 75+ countries. Every month,
-thousands of facilities report into it. Much of that data is missing, late, or wrong, and finding the
-problems is slow manual work. Meanwhile district teams wait on analysts for answers to simple questions.
+thousands of facilities report into it. Much of that data has quality issues (missing, late, or inconsistent), and finding them
+is slow manual work. Meanwhile district teams wait on analysts for answers to simple questions.
 
 DataDoctor does two things:
 
 1. **Monthly data quality report per district.** It checks reporting completeness, timeliness, unusual
-   values, and numbers that don't add up, then gives you a ranked list: *call these facilities first*.
+   values, and numbers that don't add up, then gives a ranked list of which facilities to follow up with first.
    You get a short text version (sized for WhatsApp/SMS) and an HTML report.
 2. **Ask in plain language.** For example, "ANC 1st visits by district for the last 6 months". Claude turns the
    question into a DHIS2 analytics query, DataDoctor checks every ID against your instance, runs the query, and
@@ -34,7 +34,7 @@ DataDoctor: Bo, October 2026
 - Reproductive Health: 85% reported, 85% on time
 - Child Health: 84% reported, 84% on time
 7 unusual values, 15 numbers that don't add up.
-Call these facilities first (10 of 39):
+Follow up with these facilities first (10 of 39):
 1. Bo Govt. Hosp.: no Reproductive Health report; no Child Health report
 3. Bum Kaku MCHP: ANC 4th or more visits = 15 (usually ~5.5); ANC 1st visit 5 < ANC 4th or more visits 15
 ...

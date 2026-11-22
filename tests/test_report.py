@@ -53,8 +53,8 @@ def test_report_finds_spike_missing_report_and_broken_rule():
     assert [(v.facility, v.more_value, v.less_value) for v in r.violations] == [("Hima <MCHP>", 5.0, 30.0)]
 
 
-def test_facilities_to_call_puts_the_most_problems_first():
-    calls = report().facilities_to_call
+def test_follow_up_puts_the_most_problems_first():
+    calls = report().follow_up
     assert calls[0][0] == "Hima <MCHP>"  # 2 missing reports + 1 broken rule (+ its own ANC4 spike)
     assert {name for name, _ in calls} == {"Hima <MCHP>", "Bucksal Clinic"}
 
@@ -75,3 +75,11 @@ def test_district_trend_flags_big_swings_like_for_like():
     trends = {t.element: t for t in report().trends}
     assert trends["ANC 1st visit"].ratio > 1.33  # f1 jumped from ~41 to 400
     assert "ANC 1st visit" in render_text(report())
+
+
+def test_overview_links_every_district_and_shows_its_numbers():
+    from datadoctor.report import render_index
+
+    html = render_index([(report(), "202610-bo.html")], "Sierra Leone (DHIS2 demo)")
+    assert 'href="202610-bo.html"' in html and ">Bo<" in html
+    assert "50%" in html  # Reproductive Health completeness
