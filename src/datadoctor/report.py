@@ -197,7 +197,7 @@ body { max-width: 64rem; margin: 0 auto; padding: 1rem; background: Canvas; colo
 .wrap { overflow: auto; max-block-size: min(32rem, 80vh); margin-block-end: 2rem; }
 table { border-collapse: separate; border-spacing: 0; inline-size: 100%; }
 caption { text-align: start; font-weight: 600; font-size: 1.1rem; padding-block: .5rem; }
-th, td { text-align: start; padding: .4rem .6rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
+th, td { text-align: start; vertical-align: top; padding: .4rem .6rem; border-block-end: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
 thead th { position: sticky; inset-block-start: 0; z-index: 1; background: Canvas; }
 tbody th { font-weight: 500; }
 td.num { text-align: end; font-variant-numeric: tabular-nums; }
@@ -239,9 +239,10 @@ def html_table(key: str, caption: str, headers: list[str], rows: list[list[str]]
 
 def render_html(report: Report, nav: str = "") -> str:
     e = escape
-    calls = "".join(f"<li><strong>{e(f)}</strong>: {e('; '.join(why))}</li>" for f, why in report.follow_up)
     body = (
-        f"<h2>Follow up with these facilities first</h2><ol>{calls or '<li>No problems found.</li>'}</ol>"
+        html_table("follow-up", f"Follow up with these facilities first ({len(report.follow_up)}, most issues first)",
+                   ["Facility", "Issues", "What to check"],
+                   [[e(f), str(len(why)), "<br>".join(e(w) for w in why)] for f, why in report.follow_up])
         + html_table("reporting", "Reporting", ["Dataset", "Reported", "On time", "Missing"],
                  [[e(h.dataset), _pct(h.rate), _pct(h.timely_rate), e(", ".join(h.missing)) or "None"]
                   for h in report.completeness])

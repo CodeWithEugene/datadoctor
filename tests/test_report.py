@@ -93,3 +93,10 @@ def test_email_body_is_email_safe_and_links_the_full_report():
     assert "Hima &lt;MCHP&gt;" in html
     assert 'href="https://reports.example.org/202610-bo.html"' in html
     assert "attached" in render_email(report(), None)
+
+
+def test_follow_up_list_is_a_table_worst_first():
+    html = render_html(report())
+    assert '<caption id="follow-up-caption">Follow up with these facilities first (2, most issues first)</caption>' in html
+    first_row = html.split('aria-labelledby="follow-up-caption"')[1].split("<tbody>")[1].split("</tr>")[0]
+    assert "Hima &lt;MCHP&gt;" in first_row and "<br>" in first_row
