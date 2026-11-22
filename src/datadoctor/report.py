@@ -198,7 +198,7 @@ def render_text(report: Report, top: int = 10) -> str:
 # and the mark on the sign-in page.
 LOGO_SVG = re.sub(r"<title>.*?</title>\s*", "", files("datadoctor").joinpath("logo.svg").read_text())
 # The favicon is the heartbeat line alone, cropped square: the "DHIS2" label is unreadable at 16px.
-_ICON = re.sub(r"<text.*?</text>\s*", "", LOGO_SVG, flags=re.S).replace('viewBox="0 0 96 40" width="96" height="40"', 'viewBox="0 -11 64 64" width="64" height="64"', 1)
+_ICON = re.sub(r"<text.*?</text>\s*", "", LOGO_SVG, flags=re.S).replace('viewBox="0 0 80 40" width="80" height="40"', 'viewBox="0 -11 64 64" width="64" height="64"', 1)
 FAVICON = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(" ".join(_ICON.split()))}">'
 
 _STYLE = """<style>
