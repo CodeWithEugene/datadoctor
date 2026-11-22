@@ -12,6 +12,7 @@ import time
 from base64 import b64decode
 from concurrent.futures import ThreadPoolExecutor
 from html import escape
+from importlib.resources import files
 from urllib.parse import parse_qs, quote
 
 from starlette.applications import Starlette
@@ -31,6 +32,9 @@ from .report import build_report, html_page, html_table, last_complete_month, pe
 log = logging.getLogger("datadoctor")
 PERIOD = re.compile(r"^(\d{4})-?(0[1-9]|1[0-2])$")  # 202610 or 2026-10 (what <input type=month> sends)
 MAX_QUESTION = 500
+# Inline SVG (no image request, so the strict CSP stays as it is); decorative next to the "DataDoctor" heading.
+LOGO = re.sub(r"<title>.*?</title>\s*", "", files("datadoctor").joinpath("logo.svg").read_text())
+LOGO = LOGO.replace("<svg ", '<svg aria-hidden="true" focusable="false" class="logo" ', 1)
 SESSION_COOKIE = "dd_session"
 SESSION_SECONDS = 7 * 24 * 3600
 PUBLIC_PATHS = {"/healthz", "/login"}
@@ -168,7 +172,7 @@ def create_app(dhis2, config: Config, password: str | None = None, *, username: 
         nxt = request.query_params.get("next", "")
         action = "login" + (f"?next={quote(nxt, safe='/')}" if nxt else "")
         alert = f'<p class="error" role="alert">{escape(error)}</p>' if error else ""
-        body = (f'<div class="login">{alert}<form method="post" action="{action}">'
+        body = (f'<div class="login">{LOGO}{alert}<form method="post" action="{action}">'
                 '<div><label for="username">Username</label>'
                 '<input type="text" id="username" name="username" autocomplete="username" required autofocus></div>'
                 '<div><label for="password">Password</label>'

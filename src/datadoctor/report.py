@@ -215,6 +215,7 @@ h1, h2 { text-align: center; text-wrap: balance; }
 .lede { text-align: center; max-inline-size: 48rem; margin-inline: auto; text-wrap: pretty; }
 .login { max-inline-size: 22rem; margin: 2rem auto; padding: 1.5rem; border-radius: .75rem;
          border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); }
+.login .logo { display: block; inline-size: 4.5rem; block-size: 4.5rem; margin: 0 auto 1.25rem; }
 .login form { flex-direction: column; align-items: stretch; margin: 0; gap: .9rem; }
 .login input { inline-size: 100%; box-sizing: border-box; }
 nav .logout { margin: 0; }

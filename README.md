@@ -1,8 +1,16 @@
-# DataDoctor
+<p align="center"><img src="src/datadoctor/logo.svg" alt="DataDoctor logo" width="88" height="88"></p>
 
-**Finds data quality issues in DHIS2 and tells each district which facilities to follow up with.**
+<h1 align="center">DataDoctor</h1>
 
-**Live demo:** <https://codewitheugene.github.io/datadoctor/>, rebuilt monthly from the public DHIS2 demo database.
+<p align="center"><strong>Finds data quality issues in DHIS2 and tells each district which facilities to follow up with.</strong></p>
+
+<p align="center">
+  <a href="https://dhis2datadoctor.codewitheugene.top">Live app</a> (sign-in required) ·
+  <a href="https://codewitheugene.github.io/datadoctor/">Public demo reports</a> (no sign-in, rebuilt monthly) ·
+  <a href="https://github.com/CodeWithEugene/datadoctor/actions/workflows/test.yml">Tests</a>
+</p>
+
+Both run on the public DHIS2 demo database (Sierra Leone).
 
 DHIS2 is the health information system used by ministries of health in 75+ countries. Every month,
 thousands of facilities report into it. Much of that data has quality issues (missing, late, or inconsistent),

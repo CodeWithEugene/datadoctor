@@ -138,3 +138,10 @@ def test_claude_setup_errors_are_friendly_and_leak_nothing():
 def test_server_without_claude_key_says_so_with_503():
     r = client().post("/ask", data={"q": "unconfigured"}, headers={"Sec-Fetch-Site": "same-origin"})
     assert r.status_code == 503 and "aren't set up" in r.text
+
+
+def test_login_screen_shows_the_logo():
+    page = client(password="s3cret").get("/login").text
+    login = page.split('<div class="login">')[1]
+    assert login.startswith('<svg') and 'aria-hidden="true"' in login.split(">")[0]
+    assert "<title>" not in login.split("</svg>")[0]  # decorative here: the heading already names the app
